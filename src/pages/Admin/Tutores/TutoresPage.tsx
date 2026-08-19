@@ -218,6 +218,15 @@ export default function TutoresPage() {
           }}
         />
         <Button variant="outlined" onClick={handleBuscar}>Buscar</Button>
+         <Button variant="outlined" onClick={() => {
+            setBusqueda('');
+            setBusquedaActiva('');
+            cargar(1);
+          }}
+          size="medium"          
+        >
+          Limpiar
+        </Button>
       </Box>
 
       <TablaBase

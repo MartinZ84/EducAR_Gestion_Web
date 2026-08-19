@@ -4,9 +4,7 @@ import {
   DialogTitle, IconButton, InputAdornment, TextField,
   Tooltip, Typography, Alert
 } from '@mui/material';
-import {
-  Add, Delete, Edit, Search, Visibility, VisibilityOff
-} from '@mui/icons-material';
+import { Add, Delete, Edit, Search, Visibility, VisibilityOff } from '@mui/icons-material';
 import TablaBase from '../../../components/common/TablaBase';
 import { usePaginado } from '../../../hooks/usePaginado';
 import { getDocentes, createDocente, updateDocente, deleteDocente } from '../../../api/docentesApi';
@@ -23,7 +21,6 @@ interface FormDocente {
   activo: boolean;
 }
 
-// Errores por campo del formulario
 interface FormErrors {
   dni?: string;
   nombre?: string;
@@ -49,13 +46,22 @@ export default function DocentesPage() {
   const [formError, setFormError] = useState('');
   const [campoErrors, setCampoErrors] = useState<FormErrors>({});
 
-  // useCallback: memoriza la función para que usePaginado no re-ejecute infinitamente
   const fetchFn = useCallback(
-    (p: number, c: number) => getDocentes(p, c, '', busquedaActiva),
+    (p: number, c: number) => {
+      const limpia = busquedaActiva.trim();
+      const esDni = /^\d+$/.test(limpia);
+      return getDocentes(
+        p,
+        c,
+        esDni ? '' : limpia,
+        esDni ? '' : limpia,
+        esDni ? Number(limpia) : undefined
+      );
+    },
     [busquedaActiva]
   );
 
-  const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Docente>(fetchFn);
+  const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado(fetchFn);
 
   const handleBuscar = () => {
     setBusquedaActiva(busqueda);
@@ -66,6 +72,7 @@ export default function DocentesPage() {
     setEditando(null);
     setForm(FORM_INICIAL);
     setFormError('');
+    setCampoErrors({});
     setDialogOpen(true);
   };
 
@@ -81,6 +88,7 @@ export default function DocentesPage() {
       activo: doc.activo,
     });
     setFormError('');
+    setCampoErrors({});
     setDialogOpen(true);
   };
 
@@ -90,76 +98,24 @@ export default function DocentesPage() {
     setFormError('');
   };
 
-  // const handleGuardar = async () => {
-  //   if (!form.nombre || !form.apellido || !form.email || !form.dni) {
-  //     setFormError('Completá todos los campos obligatorios.');
-  //     return;
-  //   }
-  //   if (!editando && !form.contrasena) {
-  //     setFormError('La contraseña es obligatoria al crear un docente.');
-  //     return;
-  //   }
-
-  //   setGuardando(true);
-  //   setFormError('');
-  //   try {
-  //     if (editando) {
-  //       await updateDocente(editando.idDocente, {
-  //         nombre:   form.nombre,
-  //         apellido: form.apellido,
-  //         email:    form.email,
-  //         activo:   form.activo,
-  //       });
-  //     } else {
-  //       await createDocente({
-  //         dni:           Number(form.dni),
-  //         nombre:        form.nombre,
-  //         apellido:      form.apellido,
-  //         email:         form.email,
-  //         nombreUsuario: form.nombreUsuario,
-  //         contrasena:    form.contrasena,
-  //       });
-  //     }
-  //     setDialogOpen(false);
-  //     recargar();
-  //   } catch (err: unknown) {
-  //     const e = err as { response?: { data?: { mensaje?: string } } };
-  //     setFormError(e.response?.data?.mensaje ?? 'Error al guardar.');
-  //   } finally {
-  //     setGuardando(false);
-  //   }
-  // };
   const handleGuardar = async () => {
-    // Validaciones locales antes de llamar a la API
     const errores: FormErrors = {};
 
-    if (!form.nombre.trim())
-      errores.nombre = 'El nombre es obligatorio.';
-
-    if (!form.apellido.trim())
-      errores.apellido = 'El apellido es obligatorio.';
-
-    if (!form.dni)
-      errores.dni = 'El DNI es obligatorio.';
+    if (!form.nombre.trim()) errores.nombre = 'El nombre es obligatorio.';
+    if (!form.apellido.trim()) errores.apellido = 'El apellido es obligatorio.';
+    if (!form.dni) errores.dni = 'El DNI es obligatorio.';
     else if (isNaN(Number(form.dni)) || Number(form.dni) < 1000000 || Number(form.dni) > 99999999)
       errores.dni = 'El DNI debe tener entre 7 y 8 dígitos.';
-
-    if (!form.email.trim())
-      errores.email = 'El email es obligatorio.';
+    if (!form.email.trim()) errores.email = 'El email es obligatorio.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       errores.email = 'El formato del email no es válido.';
 
     if (!editando) {
-      if (!form.nombreUsuario.trim())
-        errores.nombreUsuario = 'El nombre de usuario es obligatorio.';
-
-      if (!form.contrasena)
-        errores.contrasena = 'La contraseña es obligatoria.';
-      else if (form.contrasena.length < 6)
-        errores.contrasena = 'La contraseña debe tener al menos 6 caracteres.';
+      if (!form.nombreUsuario.trim()) errores.nombreUsuario = 'El nombre de usuario es obligatorio.';
+      if (!form.contrasena) errores.contrasena = 'La contraseña es obligatoria.';
+      else if (form.contrasena.length < 6) errores.contrasena = 'La contraseña debe tener al menos 6 caracteres.';
     }
 
-    // Si hay errores locales, los mostramos y no llamamos a la API
     if (Object.keys(errores).length > 0) {
       setCampoErrors(errores);
       return;
@@ -172,6 +128,7 @@ export default function DocentesPage() {
     try {
       if (editando) {
         await updateDocente(editando.idDocente, {
+          dni: Number(form.dni),
           nombre: form.nombre,
           apellido: form.apellido,
           email: form.email,
@@ -187,10 +144,9 @@ export default function DocentesPage() {
           contrasena: form.contrasena,
         });
       }
-      setDialogOpen(false);
+      cerrarDialog();
       recargar();
     } catch (err) {
-      // Usamos la función utilitaria para extraer el mensaje de error de la API
       setFormError(extraerMensajeError(err));
     } finally {
       setGuardando(false);
@@ -207,7 +163,6 @@ export default function DocentesPage() {
     }
   };
 
-  // Definición de columnas de la tabla
   const columnas = [
     {
       label: 'Apellido y Nombre',
@@ -228,27 +183,20 @@ export default function DocentesPage() {
     {
       label: 'Estado',
       render: (d: Docente) => (
-        <Chip
-          label={d.activo ? 'Activo' : 'Inactivo'}
-          color={d.activo ? 'success' : 'default'}
-          size="small"
-        />
+        <Chip label={d.activo ? 'Activo' : 'Inactivo'} color={d.activo ? 'success' : 'default'} size="small" />
       )
     },
     {
       label: 'Acciones',
-      width: '100px',
+      width: '120px',
+      align: 'center' as const,
       render: (d: Docente) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
           <Tooltip title="Editar">
-            <IconButton size="small" color="primary" onClick={() => abrirEditar(d)}>
-              <Edit fontSize="small" />
-            </IconButton>
+            <IconButton onClick={() => abrirEditar(d)} size="small"><Edit fontSize="small" /></IconButton>
           </Tooltip>
           <Tooltip title="Dar de baja">
-            <IconButton size="small" color="error" onClick={() => handleEliminar(d)}>
-              <Delete fontSize="small" />
-            </IconButton>
+            <IconButton color="error" onClick={() => handleEliminar(d)} size="small"><Delete fontSize="small" /></IconButton>
           </Tooltip>
         </Box>
       )
@@ -257,41 +205,48 @@ export default function DocentesPage() {
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Docentes</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Docentes </Typography>
           <Typography variant="body2" color="text.secondary">
-            Gestión de docentes de la institución
+             Gestión de docentes de la institución
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={abrirCrear}>
-          Nuevo Docente
+          Nuevo Docente  
         </Button>
       </Box>
 
-      {/* Buscador */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+      <Box sx={{ display: 'flex', gap: 2, mt: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
-          placeholder="Buscar por nombre o apellido..."
+          size="small"
+          placeholder="Nombre, apellido o DNI"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleBuscar()}
-          sx={{ maxWidth: 400 }}
+          sx={{ maxWidth: 400, flex: 1 }}
           slotProps={{
             input: {
               startAdornment: (
-                <InputAdornment position="start">
-                  <Search color="action" />
-                </InputAdornment>
+                <InputAdornment position="start"><Search color="action" /></InputAdornment>
               ),
             },
           }}
         />
-        <Button variant="outlined" onClick={handleBuscar}>Buscar</Button>
+        <Button variant="outlined" onClick={handleBuscar} size="medium">
+          Buscar
+        </Button>
+        <Button variant="outlined" onClick={() => {
+            setBusqueda('');
+            setBusquedaActiva('');
+            cargar(1);
+          }}
+          size="medium"          
+        >
+          Limpiar
+        </Button>
       </Box>
 
-      {/* Tabla */}
       <TablaBase
         columnas={columnas}
         datos={datos}
@@ -299,68 +254,41 @@ export default function DocentesPage() {
         error={error}
         pagina={pagina}
         totalPaginas={totalPaginas}
-        onCambiarPagina={cargar}
-        mensajeVacio="No se encontraron docentes."
+        onCambiarPagina={(p) => cargar(p)}
       />
 
-      {/* Dialog Crear / Editar */}
       <Dialog open={dialogOpen} onClose={cerrarDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>
-          {editando ? 'Editar Docente' : 'Nuevo Docente'}
-        </DialogTitle>
-
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
-
-          {/* Error general de la API (ej: usuario duplicado) */}
-          {formError && (
-            <Alert severity="error" sx={{ whiteSpace: 'pre-line' }}>
-              {formError}
-            </Alert>
-          )}
-
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Nombre *"
-              value={form.nombre}
-              onChange={(e) => {
-                setForm(p => ({ ...p, nombre: e.target.value }));
-                setCampoErrors(p => ({ ...p, nombre: undefined }));
-              }}
-              error={!!campoErrors.nombre}
-              helperText={campoErrors.nombre}
-            />
-            <TextField
-              label="Apellido *"
-              value={form.apellido}
-              onChange={(e) => {
-                setForm(p => ({ ...p, apellido: e.target.value }));
-                setCampoErrors(p => ({ ...p, apellido: undefined }));
-              }}
-              error={!!campoErrors.apellido}
-              helperText={campoErrors.apellido}
-            />
-          </Box>
+        <DialogTitle>{editando ? 'Editar Docente' : 'Nuevo Docente'}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          {formError && <Alert severity="error">{formError}</Alert>}
 
           <TextField
-            label="DNI *"
-            value={form.dni}
-            disabled={!!editando}
-            onChange={(e) => {
-              setForm(p => ({ ...p, dni: e.target.value }));
-              setCampoErrors(p => ({ ...p, dni: undefined }));
-            }}
-            error={!!campoErrors.dni}
-            helperText={campoErrors.dni ?? (editando ? 'El DNI no se puede modificar.' : '')}
+            label="Nombre"
+            value={form.nombre}
+            onChange={(e) => { setForm(p => ({ ...p, nombre: e.target.value })); setCampoErrors(p => ({ ...p, nombre: undefined })); }}
+            error={!!campoErrors.nombre}
+            helperText={campoErrors.nombre}
           />
-
           <TextField
-            label="Email *"
-            type="email"
+            label="Apellido"
+            value={form.apellido}
+            onChange={(e) => { setForm(p => ({ ...p, apellido: e.target.value })); setCampoErrors(p => ({ ...p, apellido: undefined })); }}
+            error={!!campoErrors.apellido}
+            helperText={campoErrors.apellido}
+          />
+          <TextField
+            label="DNI"
+            value={form.dni}
+            onChange={(e) => { setForm(p => ({ ...p, dni: e.target.value })); setCampoErrors(p => ({ ...p, dni: undefined })); }}
+            error={!!campoErrors.dni}
+            helperText={campoErrors.dni}
+            // helperText={campoErrors.dni ?? (editando ? 'El DNI no se puede modificar.' : '')}
+            // disabled={!!editando}
+          />
+          <TextField
+            label="Email"
             value={form.email}
-            onChange={(e) => {
-              setForm(p => ({ ...p, email: e.target.value }));
-              setCampoErrors(p => ({ ...p, email: undefined }));
-            }}
+            onChange={(e) => { setForm(p => ({ ...p, email: e.target.value })); setCampoErrors(p => ({ ...p, email: undefined })); }}
             error={!!campoErrors.email}
             helperText={campoErrors.email}
           />
@@ -368,24 +296,17 @@ export default function DocentesPage() {
           {!editando && (
             <>
               <TextField
-                label="Nombre de usuario *"
+                label="Nombre de usuario"
                 value={form.nombreUsuario}
-                onChange={(e) => {
-                  setForm(p => ({ ...p, nombreUsuario: e.target.value }));
-                  setCampoErrors(p => ({ ...p, nombreUsuario: undefined }));
-                }}
+                onChange={(e) => { setForm(p => ({ ...p, nombreUsuario: e.target.value })); setCampoErrors(p => ({ ...p, nombreUsuario: undefined })); }}
                 error={!!campoErrors.nombreUsuario}
                 helperText={campoErrors.nombreUsuario}
               />
-
               <TextField
-                label="Contraseña *"
+                label="Contraseña"
                 type={mostrarPass ? 'text' : 'password'}
                 value={form.contrasena}
-                onChange={(e) => {
-                  setForm(p => ({ ...p, contrasena: e.target.value }));
-                  setCampoErrors(p => ({ ...p, contrasena: undefined }));
-                }}
+                onChange={(e) => { setForm(p => ({ ...p, contrasena: e.target.value })); setCampoErrors(p => ({ ...p, contrasena: undefined })); }}
                 error={!!campoErrors.contrasena}
                 helperText={campoErrors.contrasena ?? 'Mínimo 6 caracteres.'}
                 slotProps={{
@@ -403,63 +324,13 @@ export default function DocentesPage() {
             </>
           )}
         </DialogContent>
-
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={cerrarDialog}>Cancelar</Button>
+          <Button onClick={cerrarDialog} disabled={guardando}>Cancelar</Button>
           <Button variant="contained" onClick={handleGuardar} disabled={guardando}>
-            {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Guardar Docente'}
+            {guardando ? 'Guardando...' : 'Guardar'}
           </Button>
         </DialogActions>
       </Dialog>
-      {/* <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editando ? 'Editar Docente' : 'Nuevo Docente'}</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          {formError && <Alert severity="error">{formError}</Alert>}
-
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField label="Nombre *" value={form.nombre}
-              onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))} />
-            <TextField label="Apellido *" value={form.apellido}
-              onChange={(e) => setForm(p => ({ ...p, apellido: e.target.value }))} />
-          </Box>
-
-          <TextField label="DNI *" value={form.dni} disabled={!!editando}
-            onChange={(e) => setForm(p => ({ ...p, dni: e.target.value }))} />
-
-          <TextField label="Email *" type="email" value={form.email}
-            onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} />
-
-          {!editando && (
-            <>
-              <TextField label="Nombre de usuario *" value={form.nombreUsuario}
-                onChange={(e) => setForm(p => ({ ...p, nombreUsuario: e.target.value }))} />
-              <TextField
-                label="Contraseña *"
-                type={mostrarPass ? 'text' : 'password'}
-                value={form.contrasena}
-                onChange={(e) => setForm(p => ({ ...p, contrasena: e.target.value }))}
-                slotProps={{
-                  input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setMostrarPass(!mostrarPass)}>
-                          {mostrarPass ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-            </>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleGuardar} disabled={guardando}>
-            {guardando ? 'Guardando...' : 'Guardar Docente'}
-          </Button>
-        </DialogActions>
-      </Dialog> */}
     </Box>
   );
 }

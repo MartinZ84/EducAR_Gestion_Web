@@ -19,6 +19,7 @@ import {
   Link as LinkIcon,
   Logout,
   ChevronLeft,
+  Description,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 
@@ -32,6 +33,7 @@ import CursosPage from './Cursos/CursosPage';
 import CiclosLectivosPage from './CiclosLectivos/CiclosLectivosPage';
 import UsuariosPage from './Usuarios/UsuariosPage';
 import AsignacionesPage from './Asignaciones/AsignacionesPage';
+import MatriculasPage from './Matriculas/MatriculasPage';
 
 const DRAWER_WIDTH = 260;
 const DRAWER_MINI_WIDTH = 72;
@@ -42,11 +44,12 @@ const menuItems = [
   { label: 'Docentes', icon: <School />, ruta: '/admin/docentes' },
   { label: 'Tutores', icon: <FamilyRestroom />, ruta: '/admin/tutores' },
   { label: 'Alumnos', icon: <ChildCare />, ruta: '/admin/alumnos' },
-  { label: 'Materias', icon: <Book />, ruta: '/admin/materias' },
+  { label: 'Materias', icon: <Description />, ruta: '/admin/materias' },
   { label: 'Cursos', icon: <Class />, ruta: '/admin/cursos' },
   { label: 'Ciclos Lectivos', icon: <CalendarMonth />, ruta: '/admin/ciclos' },
   { label: 'Usuarios', icon: <People />, ruta: '/admin/usuarios' },
   { label: 'Asignaciones', icon: <LinkIcon />, ruta: '/admin/asignaciones' },
+  { label: 'Matrículas', icon: <School />, ruta: '/admin/matriculas' },
 ];
 
 export default function AdminLayout() {
@@ -285,6 +288,7 @@ export default function AdminLayout() {
             <Route path="ciclos/*" element={<CiclosLectivosPage />} />
             <Route path="usuarios/*" element={<UsuariosPage />} />
             <Route path="asignaciones/*" element={<AsignacionesPage />} />
+            <Route path="/matriculas" element={<MatriculasPage />} />
           </Routes>
         </Box>
       </Box>

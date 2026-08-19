@@ -24,3 +24,4 @@ export const createCicloLectivo = async (dto: CicloLectivoCreateDto) => {
 export const updateCicloLectivo = async (id: number, dto: CicloLectivoUpdateDto) => {
   await api.put(`/cicloslectivos/${id}`, dto);
 };
+

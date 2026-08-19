@@ -1,47 +1,98 @@
 import { useState, useCallback } from 'react';
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, IconButton, InputAdornment, TextField,
-  Tooltip, Typography, Alert
+  DialogTitle, Divider, IconButton, InputAdornment, TextField,
+  Tooltip, Typography, Alert, List, ListItem, ListItemText,
+  Paper, Grid,
 } from '@mui/material';
-import { Add, Delete, Edit, Search } from '@mui/icons-material';
+import {
+  Add, Delete, Edit, Search, Phone, Home, Person, Clear as ClearIcon
+} from '@mui/icons-material';
+import dayjs from 'dayjs';
 import TablaBase from '../../../components/common/TablaBase';
 import { usePaginado } from '../../../hooks/usePaginado';
-import { getAlumnos, createAlumno, updateAlumno, deleteAlumno } from '../../../api/alumnosApi';
+import {
+  getAlumnos, createAlumno, updateAlumno, deleteAlumno
+} from '../../../api/alumnosApi';
+import {
+  getTelefonosPorAlumno, createTelefono, deleteTelefono,
+  TelefonoContacto
+} from '../../../api/telefonosApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { Alumno } from '../../../types';
 
 interface FormAlumno {
-  dni:      string;
-  nombre:   string;
+  dni: string;
+  nombre: string;
   apellido: string;
-  activo:   boolean;
+  fechaNacimiento: string;
+  activo: boolean;
+  calle: string;
+  numero: string;
+  piso: string;
+  departamento: string;
+  barrio: string;
+  localidad: string;
+  provincia: string;
 }
 
 interface FormErrors {
-  dni?:      string;
-  nombre?:   string;
+  dni?: string;
+  nombre?: string;
   apellido?: string;
+  fechaNacimiento?: string;
 }
 
-const FORM_INICIAL: FormAlumno = { dni: '', nombre: '', apellido: '', activo: true };
+interface TelefonoForm {
+  idTelefono?: number;
+  numero: string;
+  esNuevo: boolean;
+}
+
+const FORM_INICIAL: FormAlumno = {
+  dni: '', nombre: '', apellido: '', fechaNacimiento: '', activo: true,
+  calle: '', numero: '', piso: '', departamento: '',
+  barrio: '', localidad: '', provincia: '',
+};
 
 export default function AlumnosPage() {
-  const [busqueda, setBusqueda]             = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [busquedaActiva, setBusquedaActiva] = useState('');
-  const [dialogOpen, setDialogOpen]         = useState(false);
-  const [editando, setEditando]             = useState<Alumno | null>(null);
-  const [form, setForm]                     = useState<FormAlumno>(FORM_INICIAL);
-  const [campoErrors, setCampoErrors]       = useState<FormErrors>({});
-  const [formError, setFormError]           = useState('');
-  const [guardando, setGuardando]           = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editando, setEditando] = useState<Alumno | null>(null);
+  const [form, setForm] = useState<FormAlumno>(FORM_INICIAL);
+  const [campoErrors, setCampoErrors] = useState<FormErrors>({});
+  const [formError, setFormError] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  const [telefonos, setTelefonos] = useState<TelefonoForm[]>([]);
+  const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [cargandoTelefonos, setCargandoTelefonos] = useState(false);
 
   const fetchFn = useCallback(
-    (p: number, c: number) => getAlumnos(p, c, '', busquedaActiva),
+    (p: number, c: number) => {
+      const limpia = busquedaActiva.trim();
+
+      // Si no hay término de búsqueda, obtener todos
+      if (!limpia) {
+        return getAlumnos(p, c, '', '', undefined);
+      }
+
+      const esDni = /^\d+$/.test(limpia);
+
+      if (esDni) {
+        // Buscar por DNI
+        return getAlumnos(p, c, '', '', Number(limpia));
+      } else {
+        // IMPORTANTE: Solo enviar el término en el parámetro "nombre"
+        // El backend busca en Nombre OR Apellido usando este parámetro
+        return getAlumnos(p, c, limpia, '', undefined);
+      }
+    },
     [busquedaActiva]
   );
 
-  const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Alumno>(fetchFn);
+  const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado(fetchFn);
 
   const handleBuscar = () => {
     setBusquedaActiva(busqueda);
@@ -51,36 +102,101 @@ export default function AlumnosPage() {
   const abrirCrear = () => {
     setEditando(null);
     setForm(FORM_INICIAL);
+    setTelefonos([]);
+    setNuevoTelefono('');
     setCampoErrors({});
     setFormError('');
     setDialogOpen(true);
   };
 
-  const abrirEditar = (a: Alumno) => {
+  const abrirEditar = async (a: Alumno) => {
     setEditando(a);
-    setForm({ dni: String(a.dni), nombre: a.nombre, apellido: a.apellido, activo: a.activo });
+    setForm({
+      dni: String(a.dni),
+      nombre: a.nombre,
+      apellido: a.apellido,
+      fechaNacimiento: a.fechaNacimiento
+        ? dayjs(a.fechaNacimiento).format('YYYY-MM-DD')
+        : '',
+      activo: a.activo,
+      calle: a.calle ?? '',
+      numero: a.numero ?? '',
+      piso: a.piso ?? '',
+      departamento: a.departamento ?? '',
+      barrio: a.barrio ?? '',
+      localidad: a.localidad ?? '',
+      provincia: a.provincia ?? '',
+    });
     setCampoErrors({});
     setFormError('');
+    setNuevoTelefono('');
     setDialogOpen(true);
+
+    setCargandoTelefonos(true);
+    try {
+      const tels = await getTelefonosPorAlumno(a.idAlumno);
+      setTelefonos(tels.map((t) => ({ idTelefono: t.idTelefono, numero: t.numero, esNuevo: false })));
+    } catch {
+      setTelefonos([]);
+    } finally {
+      setCargandoTelefonos(false);
+    }
   };
 
   const cerrarDialog = () => {
     setDialogOpen(false);
     setCampoErrors({});
     setFormError('');
+    setTelefonos([]);
+    setNuevoTelefono('');
+  };
+
+  const agregarTelefono = () => {
+    const limpio = nuevoTelefono.trim();
+    if (!limpio) return;
+    if (telefonos.some((t) => t.numero === limpio)) {
+      setFormError('Ese número ya está agregado.');
+      return;
+    }
+    setTelefonos((prev) => [...prev, { numero: limpio, esNuevo: true }]);
+    setNuevoTelefono('');
+    setFormError('');
+  };
+
+  const quitarTelefono = async (index: number) => {
+    const tel = telefonos[index];
+    if (tel.idTelefono && !tel.esNuevo) {
+      try {
+        await deleteTelefono(tel.idTelefono);
+      } catch (err) {
+        setFormError(extraerMensajeError(err));
+        return;
+      }
+    }
+    setTelefonos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const sincronizarTelefonos = async (idAlumno: number) => {
+    const nuevos = telefonos.filter((t) => t.esNuevo);
+    for (const tel of nuevos) {
+      await createTelefono({ idAlumno, numero: tel.numero });
+    }
   };
 
   const handleGuardar = async () => {
     const errores: FormErrors = {};
 
-    if (!form.nombre.trim())
-      errores.nombre = 'El nombre es obligatorio.';
-    if (!form.apellido.trim())
-      errores.apellido = 'El apellido es obligatorio.';
-    if (!form.dni)
-      errores.dni = 'El DNI es obligatorio.';
+    if (!form.nombre.trim()) errores.nombre = 'El nombre es obligatorio.';
+    if (!form.apellido.trim()) errores.apellido = 'El apellido es obligatorio.';
+    if (!form.dni) errores.dni = 'El DNI es obligatorio.';
     else if (isNaN(Number(form.dni)) || Number(form.dni) < 1000000 || Number(form.dni) > 99999999)
       errores.dni = 'El DNI debe tener entre 7 y 8 dígitos.';
+
+    if (form.fechaNacimiento) {
+      const fecha = dayjs(form.fechaNacimiento, 'YYYY-MM-DD', true);
+      if (!fecha.isValid()) errores.fechaNacimiento = 'La fecha no es válida.';
+      else if (fecha.isAfter(dayjs())) errores.fechaNacimiento = 'La fecha no puede ser futura.';
+    }
 
     if (Object.keys(errores).length > 0) {
       setCampoErrors(errores);
@@ -92,18 +208,34 @@ export default function AlumnosPage() {
     setCampoErrors({});
 
     try {
+      const dtoBase = {
+        nombre: form.nombre,
+        apellido: form.apellido,
+        fechaNacimiento: form.fechaNacimiento || undefined,
+        calle: form.calle || undefined,
+        numero: form.numero || undefined,
+        piso: form.piso || undefined,
+        departamento: form.departamento || undefined,
+        barrio: form.barrio || undefined,
+        localidad: form.localidad || undefined,
+        provincia: form.provincia || undefined,
+      };
+
       if (editando) {
         await updateAlumno(editando.idAlumno, {
-          nombre:   form.nombre,
-          apellido: form.apellido,
-          activo:   form.activo,
+          ...dtoBase,
+          activo: form.activo,
         });
+        await sincronizarTelefonos(editando.idAlumno);
       } else {
-        await createAlumno({
-          dni:      Number(form.dni),
-          nombre:   form.nombre,
-          apellido: form.apellido,
+        const creado = await createAlumno({
+          dni: Number(form.dni),
+          ...dtoBase,
         });
+        const idNuevoAlumno = creado?.idAlumno;
+        if (idNuevoAlumno && telefonos.length > 0) {
+          await sincronizarTelefonos(idNuevoAlumno);
+        }
       }
       cerrarDialog();
       recargar();
@@ -120,64 +252,89 @@ export default function AlumnosPage() {
       await deleteAlumno(a.idAlumno);
       recargar();
     } catch (err) {
-      alert(extraerMensajeError(err));
+      alert(extraerMensajeError(err as Error));
     }
   };
 
+  const domicilioResumido = (a: Alumno) => {
+    const partes = [a.calle, a.numero, a.barrio, a.localidad].filter(Boolean);
+    return partes.length > 0 ? partes.join(', ') : '—';
+  };
+
   const columnas = [
-    { label: 'Apellido y Nombre', render: (a: Alumno) => `${a.apellido}, ${a.nombre}` },
-    { label: 'DNI',               render: (a: Alumno) => a.dni.toLocaleString('es-AR') },
     {
-      label:  'Estado',
+      label: 'Apellido y Nombre',
+      render: (a: Alumno) => `${a.apellido}, ${a.nombre}`,
+    },
+    {
+      label: 'DNI',
+      render: (a: Alumno) => a.dni.toLocaleString('es-AR'),
+    },
+    {
+      label: 'Fec. Nac.',
+      render: (a: Alumno) =>
+        a.fechaNacimiento
+          ? dayjs(a.fechaNacimiento).format('DD/MM/YYYY')
+          : '—',
+    },
+    {
+      label: 'Domicilio',
+      render: (a: Alumno) => (
+        <Tooltip title={domicilioResumido(a)}>
+          <span>{domicilioResumido(a)}</span>
+        </Tooltip>
+      ),
+    },
+    {
+      label: 'Estado',
       render: (a: Alumno) => (
         <Chip
           label={a.activo ? 'Activo' : 'Inactivo'}
           color={a.activo ? 'success' : 'default'}
           size="small"
         />
-      )
+      ),
     },
     {
-      label:  'Acciones',
-      width:  '100px',
+      label: 'Acciones',
+      width: '120px',
+      align: 'center' as const,
       render: (a: Alumno) => (
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
           <Tooltip title="Editar">
-            <IconButton size="small" color="primary" onClick={() => abrirEditar(a)}>
-              <Edit fontSize="small" />
-            </IconButton>
+            <IconButton onClick={() => abrirEditar(a)} size="small"><Edit fontSize="small" /></IconButton>
           </Tooltip>
           <Tooltip title="Dar de baja">
-            <IconButton size="small" color="error" onClick={() => handleEliminar(a)}>
-              <Delete fontSize="small" />
-            </IconButton>
+            <IconButton color="error" onClick={() => handleEliminar(a)} size="small"><Delete fontSize="small" /></IconButton>
           </Tooltip>
         </Box>
-      )
+      ),
     },
   ];
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Alumnos</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Alumnos </Typography>
           <Typography variant="body2" color="text.secondary">
-            Gestión de alumnos de la institución
+             Gestión de alumnos de la institución
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={abrirCrear}>
-          Nuevo Alumno
+          Nuevo Alumno  
         </Button>
       </Box>
+    
 
-      <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+      <Box sx={{ display: 'flex', gap: 2, mt: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
         <TextField
-          placeholder="Buscar por nombre o apellido..."
+          size="small"
+          placeholder="Nombre, apellido o DNI"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleBuscar()}
-          sx={{ maxWidth: 400 }}
+          sx={{ maxWidth: 400, flex: 1 }}
           slotProps={{
             input: {
               startAdornment: (
@@ -188,7 +345,21 @@ export default function AlumnosPage() {
             },
           }}
         />
-        <Button variant="outlined" onClick={handleBuscar}>Buscar</Button>
+        <Button variant="outlined" onClick={handleBuscar} size="medium">
+          Buscar
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => {
+            setBusqueda('');
+            setBusquedaActiva('');
+            cargar(1);
+          }}
+          size="medium"          
+        >
+          Limpiar
+        </Button>
+       
       </Box>
 
       <TablaBase
@@ -198,56 +369,234 @@ export default function AlumnosPage() {
         error={error}
         pagina={pagina}
         totalPaginas={totalPaginas}
-        onCambiarPagina={cargar}
-        mensajeVacio="No se encontraron alumnos."
+        onCambiarPagina={(p) => cargar(p)}
       />
 
-      <Dialog open={dialogOpen} onClose={cerrarDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>
+      <Dialog
+        open={dialogOpen}
+        onClose={cerrarDialog}
+        maxWidth="md"
+        fullWidth
+        scroll="paper"
+      >
+        <DialogTitle>
           {editando ? 'Editar Alumno' : 'Nuevo Alumno'}
         </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {formError && <Alert severity="error">{formError}</Alert>}
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Nombre *"
-              value={form.nombre}
-              onChange={(e) => {
-                setForm(p => ({ ...p, nombre: e.target.value }));
-                setCampoErrors(p => ({ ...p, nombre: undefined }));
-              }}
-              error={!!campoErrors.nombre}
-              helperText={campoErrors.nombre}
-            />
-            <TextField
-              label="Apellido *"
-              value={form.apellido}
-              onChange={(e) => {
-                setForm(p => ({ ...p, apellido: e.target.value }));
-                setCampoErrors(p => ({ ...p, apellido: undefined }));
-              }}
-              error={!!campoErrors.apellido}
-              helperText={campoErrors.apellido}
-            />
+          <Box>
+            <Typography
+              variant="subtitle1"
+
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, fontWeight: 600 }}
+            >
+              <Person fontSize="small" color="primary" /> Datos personales
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Nombre"
+                  value={form.nombre}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, nombre: e.target.value }));
+                    setCampoErrors((p) => ({ ...p, nombre: undefined }));
+                  }}
+                  error={!!campoErrors.nombre}
+                  helperText={campoErrors.nombre}
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Apellido"
+                  value={form.apellido}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, apellido: e.target.value }));
+                    setCampoErrors((p) => ({ ...p, apellido: undefined }));
+                  }}
+                  error={!!campoErrors.apellido}
+                  helperText={campoErrors.apellido}
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="DNI"
+                  value={form.dni}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, dni: e.target.value }));
+                    setCampoErrors((p) => ({ ...p, dni: undefined }));
+                  }}
+                  error={!!campoErrors.dni}
+                  helperText={campoErrors.dni ?? (editando ? 'El DNI no se puede modificar.' : '')}
+                  disabled={!!editando}
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Fecha de nacimiento"
+                  type="date"
+                  value={form.fechaNacimiento}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, fechaNacimiento: e.target.value }));
+                    setCampoErrors((p) => ({ ...p, fechaNacimiento: undefined }));
+                  }}
+                  error={!!campoErrors.fechaNacimiento}
+                  helperText={campoErrors.fechaNacimiento ?? 'Opcional'}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
           </Box>
 
-          <TextField
-            label="DNI *"
-            value={form.dni}
-            disabled={!!editando}
-            onChange={(e) => {
-              setForm(p => ({ ...p, dni: e.target.value }));
-              setCampoErrors(p => ({ ...p, dni: undefined }));
-            }}
-            error={!!campoErrors.dni}
-            helperText={campoErrors.dni ?? (editando ? 'El DNI no se puede modificar.' : '')}
-          />
+          <Divider />
+
+          <Box>
+            <Typography
+              variant="subtitle1"
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, fontWeight: 600 }}
+            >
+              <Home fontSize="small" color="primary" /> Domicilio
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 8 }}>
+                <TextField
+                  label="Calle"
+                  value={form.calle}
+                  onChange={(e) => setForm((p) => ({ ...p, calle: e.target.value }))}
+                  placeholder="Ej: Av. Corrientes"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField
+                  label="Número"
+                  value={form.numero}
+                  onChange={(e) => setForm((p) => ({ ...p, numero: e.target.value }))}
+                  placeholder="Ej: 1234"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField
+                  label="Piso"
+                  value={form.piso}
+                  onChange={(e) => setForm((p) => ({ ...p, piso: e.target.value }))}
+                  placeholder="Ej: 3"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField
+                  label="Departamento"
+                  value={form.departamento}
+                  onChange={(e) => setForm((p) => ({ ...p, departamento: e.target.value }))}
+                  placeholder="Ej: B"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField
+                  label="Barrio"
+                  value={form.barrio}
+                  onChange={(e) => setForm((p) => ({ ...p, barrio: e.target.value }))}
+                  placeholder="Ej: Villa Crespo"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Localidad"
+                  value={form.localidad}
+                  onChange={(e) => setForm((p) => ({ ...p, localidad: e.target.value }))}
+                  placeholder="Ej: CABA"
+                  fullWidth
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  label="Provincia"
+                  value={form.provincia}
+                  onChange={(e) => setForm((p) => ({ ...p, provincia: e.target.value }))}
+                  placeholder="Ej: Buenos Aires"
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
+          </Box>
+
+          <Divider />
+
+          <Box>
+            <Typography
+              sx={{ variant: "subtitle1", fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
+
+            >
+              <Phone fontSize="small" color="primary" /> Teléfonos de contacto
+            </Typography>
+
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField
+                size="small"
+                placeholder="Número de teléfono"
+                value={nuevoTelefono}
+                onChange={(e) => setNuevoTelefono(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && agregarTelefono()}
+                fullWidth
+              />
+              <Button variant="outlined" onClick={agregarTelefono} size="medium">
+                Agregar
+              </Button>
+            </Box>
+
+            {cargandoTelefonos ? (
+              <Typography variant="body2" color="text.secondary">
+                Cargando teléfonos...
+              </Typography>
+            ) : telefonos.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No hay teléfonos registrados.
+              </Typography>
+            ) : (
+              <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+                <List dense>
+                  {telefonos.map((tel, idx) => (
+                    <ListItem
+                      key={`${tel.idTelefono ?? 'nuevo'}-${idx}`}
+                      secondaryAction={
+                        <Tooltip title="Quitar">
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            color="error"
+                            onClick={() => quitarTelefono(idx)}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    >
+                      <ListItemText primary={tel.numero} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Paper>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={cerrarDialog}>Cancelar</Button>
-          <Button variant="contained" onClick={handleGuardar} disabled={guardando}>
-            {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Guardar Alumno'}
+          <Button onClick={cerrarDialog} disabled={guardando}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleGuardar}
+            disabled={guardando}
+          >
+            {guardando ? 'Guardando...' : 'Guardar'}
           </Button>
         </DialogActions>
       </Dialog>

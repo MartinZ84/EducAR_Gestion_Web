@@ -22,3 +22,8 @@ export const getCurso = async (id: number) => {
   const res = await api.get<Curso>(`/Cursos/${id}`);
   return res.data;
 };
+
+export const getCursosPorCiclo = async (idCicloLectivo: number): Promise<Curso[]> => {
+  const res = await api.get<Curso[]>(`/cursos/ciclo/${idCicloLectivo}`);
+  return res.data;
+};
