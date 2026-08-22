@@ -10,6 +10,7 @@ import { usePaginado } from '../../../hooks/usePaginado';
 import { getDocentes, createDocente, updateDocente, deleteDocente } from '../../../api/docentesApi';
 import { Docente } from '../../../types';
 import { extraerMensajeError } from '../../../utils/apiErrors';
+import DocenteDetalleModal from '../../../components/modals/DocenteDetalleModal';
 
 interface FormDocente {
   dni: string;
@@ -36,6 +37,7 @@ const FORM_INICIAL: FormDocente = {
 };
 
 export default function DocentesPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [busquedaActiva, setBusquedaActiva] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -63,10 +65,7 @@ export default function DocentesPage() {
 
   const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado(fetchFn);
 
-  const handleBuscar = () => {
-    setBusquedaActiva(busqueda);
-    cargar(1);
-  };
+  const handleBuscar = () => setBusquedaActiva(busqueda.trim());
 
   const abrirCrear = () => {
     setEditando(null);
@@ -192,6 +191,9 @@ export default function DocentesPage() {
       align: 'center' as const,
       render: (d: Docente) => (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
+          <Tooltip title="Ver detalle">
+            <IconButton onClick={() => setDetalleId(d.idDocente)} size="small"><Visibility fontSize="small" /></IconButton>
+          </Tooltip>
           <Tooltip title="Editar">
             <IconButton onClick={() => abrirEditar(d)} size="small"><Edit fontSize="small" /></IconButton>
           </Tooltip>
@@ -239,7 +241,6 @@ export default function DocentesPage() {
         <Button variant="outlined" onClick={() => {
             setBusqueda('');
             setBusquedaActiva('');
-            cargar(1);
           }}
           size="medium"          
         >
@@ -331,6 +332,7 @@ export default function DocentesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <DocenteDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

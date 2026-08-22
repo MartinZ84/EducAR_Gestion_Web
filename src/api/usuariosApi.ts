@@ -1,5 +1,5 @@
 import api from './axios';
-import { ResultadoPaginado } from '../types';
+import { ResultadoPaginado, UsuarioDetalle } from '../types';
 
 export interface Usuario {
   idUsuario: number;
@@ -61,4 +61,9 @@ export const updateUsuario = async (id: number, dto: {
 
 export const deleteUsuario = async (id: number) => {
   await api.delete(`/usuarios/${id}`);
+};
+
+export const getUsuarioDetalle = async (id: number) => {
+  const res = await api.get<UsuarioDetalle>(`/usuarios/${id}/detalle`);
+  return res.data;
 };

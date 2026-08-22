@@ -1,5 +1,5 @@
 import api from './axios';
-import { ResultadoPaginado, Docente } from '../types';
+import { ResultadoPaginado, Docente, DocenteDetalle } from '../types';
 
 export const getDocentes = async (
   pagina = 1,
@@ -42,4 +42,9 @@ export const updateDocente = async (id: number, dto: {
 
 export const deleteDocente = async (id: number) => {
   await api.delete(`/docentes/${id}`);
+};
+
+export const getDocenteDetalle = async (id: number) => {
+  const res = await api.get<DocenteDetalle>(`/docentes/${id}/detalle`);
+  return res.data;
 };

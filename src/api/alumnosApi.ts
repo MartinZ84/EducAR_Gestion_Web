@@ -1,5 +1,5 @@
 import api from './axios';
-import { ResultadoPaginado, Alumno } from '../types';
+import { ResultadoPaginado, Alumno, AlumnoDetalle } from '../types';
 
 export const getAlumnos = async (
   pagina = 1,
@@ -45,6 +45,7 @@ export const createAlumno = async (dto: {
 };
 
 export const updateAlumno = async (id: number, dto: {
+  dni: number;
   nombre: string;
   apellido: string;
   fechaNacimiento?: string;
@@ -63,4 +64,9 @@ export const updateAlumno = async (id: number, dto: {
 
 export const deleteAlumno = async (id: number) => {
   await api.delete(`/Alumnos/${id}`);
+};
+
+export const getAlumnoDetalle = async (id: number) => {
+  const res = await api.get<AlumnoDetalle>(`/Alumnos/${id}/detalle`);
+  return res.data;
 };

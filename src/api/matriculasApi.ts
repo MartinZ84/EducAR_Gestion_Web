@@ -6,7 +6,11 @@ export interface AlumnoDisponible {
   nombre: string;
   apellido: string;
   dni: number;
-  fechaNacimiento: string;
+  fecNac?: string | null;
+  matriculado: boolean;
+  idMatricula?: number;
+  cursoActual?: string;
+  estadoMatricula?: string;
 }
 
 export interface MatriculaAsignacionMasivaDto {

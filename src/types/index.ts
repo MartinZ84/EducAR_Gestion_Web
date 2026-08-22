@@ -179,3 +179,164 @@ export interface ResultadoPaginado<T> {
   tienePaginaSiguiente: boolean;
   datos: T[];
 }
+
+export interface UsuarioDetalle {
+  idUsuario: number;
+  dni: number;
+  nombre: string;
+  apellido: string;
+  rol: string;
+  email: string;
+  activo: boolean;
+  fechaCrea: string;
+  fechaAct: string;
+}
+
+export interface DocenteDetalle {
+  idDocente: number;
+  dni: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  activo: boolean;
+  cursosAsignados: CursoDocenteDetalle[];
+}
+
+export interface CursoDocenteDetalle {
+  idCurso: number;
+  curso: string;
+  materia: string;
+  cicloLectivo: string;
+}
+
+export interface TutorDetalle {
+  idTutor: number;
+  dni: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  activo: boolean;
+  alumnosAsignados: AlumnoTutorDetalle[];
+}
+
+export interface AlumnoTutorDetalle {
+  idAlumno: number;
+  dni: number;
+  nombreCompleto: string;
+  cursoActual: string;
+}
+
+export interface AlumnoDetalle {
+  idAlumno: number;
+  dni: number;
+  nombre: string;
+  apellido: string;
+  fecNac?: string | null;
+  activo: boolean;
+  calle?: string | null;
+  numero?: string | null;
+  piso?: string | null;
+  departamento?: string | null;
+  barrio?: string | null;
+  localidad?: string | null;
+  provincia?: string | null;
+  telefonos: TelefonoDetalle[];
+  matriculaActual?: MatriculaActualDetalle | null;
+  tutores: AlumnoTutorAsignadoDetalle[];
+  asistenciaResumen: AsistenciaResumenDetalle;
+  asistencias: AsistenciaDetalle[];
+  calificaciones: CalificacionDetalle[];
+  boletines: BoletinDetalle[];
+}
+
+export interface MatriculaActualDetalle {
+  idCurso: number;
+  curso: string;
+  cicloLectivo: string;
+  fechaMatricula: string;
+}
+
+export interface AlumnoTutorAsignadoDetalle {
+  idTutor: number;
+  nombreCompleto: string;
+  parentesco?: string | null;
+}
+
+export interface AsistenciaResumenDetalle {
+  presentes: number;
+  ausentes: number;
+  justificadas: number;
+}
+
+export interface AsistenciaDetalle {
+  idAsistencia: number;
+  fecha: string;
+  presente: boolean;
+  estado: string;
+}
+
+export interface CalificacionDetalle {
+  materia: string;
+  nota: number;
+  periodo: string;
+}
+
+export interface BoletinDetalle {
+  periodo: string;
+  promedio: number;
+  estado: string;
+}
+
+export interface CursoDetalle {
+  idCurso: number;
+  nombre: string;
+  division: string;
+  turno?: string | null;
+  cicloLectivo: string;
+  alumnosMatriculados: AlumnoCursoDetalle[];
+  cantidadTotalAlumnos: number;
+}
+
+export interface AlumnoCursoDetalle {
+  idAlumno: number;
+  dni: number;
+  nombreCompleto: string;
+}
+
+export interface MateriaDetalle {
+  idMateria: number;
+  nombre: string;
+  descripcion?: string | null;
+  docentesAsignados: DocenteMateriaDetalle[];
+  cursos: CursoMateriaDetalle[];
+}
+
+export interface DocenteMateriaDetalle {
+  idDocente: number;
+  nombreCompleto: string;
+}
+
+export interface CursoMateriaDetalle {
+  idCurso: number;
+  curso: string;
+  cicloLectivo: string;
+}
+
+export interface CicloLectivoDetalle {
+  idCicloLectivo: number;
+  anio: number;
+  fechaInicio: string;
+  fechaFin: string;
+  activo: boolean;
+  cursos: CursoCicloLectivoDetalle[];
+  cantidadCursos: number;
+  cantidadAlumnosMatriculados: number;
+}
+
+export interface CursoCicloLectivoDetalle {
+  idCurso: number;
+  curso: string;
+  cantidadAlumnos: number;
+}
+
+export interface TelefonoDetalle { numero: string; des?: string | null; }

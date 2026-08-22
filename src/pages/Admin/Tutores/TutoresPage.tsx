@@ -10,6 +10,7 @@ import { usePaginado } from '../../../hooks/usePaginado';
 import { getTutores, createTutor, updateTutor, deleteTutor } from '../../../api/tutoresApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { Tutor } from '../../../types';
+import TutorDetalleModal from '../../../components/modals/TutorDetalleModal';
 
 interface FormTutor {
   dni:           string;
@@ -37,6 +38,7 @@ const FORM_INICIAL: FormTutor = {
 };
 
 export default function TutoresPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [busqueda, setBusqueda]             = useState('');
   const [busquedaActiva, setBusquedaActiva] = useState('');
   const [dialogOpen, setDialogOpen]         = useState(false);
@@ -47,14 +49,16 @@ export default function TutoresPage() {
   const [mostrarPass, setMostrarPass]       = useState(false);
   const [guardando, setGuardando]           = useState(false);
 
-  const fetchFn = useCallback(
-    (p: number, c: number) => getTutores(p, c, '', busquedaActiva),
-    [busquedaActiva]
-  );
+  const fetchFn = useCallback((p: number, c: number) => {
+    const limpia = busquedaActiva.trim();
+    if (!limpia) return getTutores(p, c);
+    if (/^\d+$/.test(limpia)) return getTutores(p, c, '', '', Number(limpia));
+    return getTutores(p, c, limpia, limpia);
+  }, [busquedaActiva]);
 
   const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Tutor>(fetchFn);
 
-  const handleBuscar = () => { setBusquedaActiva(busqueda); cargar(1); };
+  const handleBuscar = () => setBusquedaActiva(busqueda.trim());
 
   const abrirCrear = () => {
     setEditando(null);
@@ -111,6 +115,7 @@ export default function TutoresPage() {
     try {
       if (editando) {
         await updateTutor(editando.idTutor, {
+          dni: Number(form.dni),
           nombre:        form.nombre,
           apellido:      form.apellido,
           email:         form.email,
@@ -171,6 +176,7 @@ export default function TutoresPage() {
       label: 'Acciones', width: '100px',
       render: (t: Tutor) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Ver detalle"><IconButton size="small" onClick={() => setDetalleId(t.idTutor)}><Visibility fontSize="small" /></IconButton></Tooltip>
           <Tooltip title="Editar">
             <IconButton size="small" color="primary" onClick={() => abrirEditar(t)}>
               <Edit fontSize="small" />
@@ -221,7 +227,6 @@ export default function TutoresPage() {
          <Button variant="outlined" onClick={() => {
             setBusqueda('');
             setBusquedaActiva('');
-            cargar(1);
           }}
           size="medium"          
         >
@@ -256,7 +261,7 @@ export default function TutoresPage() {
           </Box>
 
           <TextField
-            label="DNI *" value={form.dni} disabled={!!editando}
+            label="DNI *" value={form.dni}
             onChange={(e) => { setForm(p => ({ ...p, dni: e.target.value })); setCampoErrors(p => ({ ...p, dni: undefined })); }}
             error={!!campoErrors.dni}
             helperText={campoErrors.dni ?? (editando ? 'El DNI no se puede modificar.' : '')}
@@ -315,6 +320,7 @@ export default function TutoresPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <TutorDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

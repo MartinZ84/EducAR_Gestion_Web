@@ -2,14 +2,15 @@ import { useState, useCallback } from 'react';
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, InputAdornment, TextField,
-  Tooltip, Typography, Alert
+  Tooltip, Typography, Alert, FormControlLabel, Switch
 } from '@mui/material';
-import { Add, Delete, Edit, Search } from '@mui/icons-material';
+import { Add, Delete, Edit, Search, Visibility } from '@mui/icons-material';
 import TablaBase from '../../../components/common/TablaBase';
 import { usePaginado } from '../../../hooks/usePaginado';
 import { getMaterias, createMateria, updateMateria, deleteMateria } from '../../../api/materiasApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { Materia } from '../../../types';
+import MateriaDetalleModal from '../../../components/modals/MateriaDetalleModal';
 
 interface FormMateria {
   nombre:      string;
@@ -24,6 +25,7 @@ interface FormErrors {
 const FORM_INICIAL: FormMateria = { nombre: '', descripcion: '', activo: true };
 
 export default function MateriasPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [busqueda, setBusqueda]             = useState('');
   const [busquedaActiva, setBusquedaActiva] = useState('');
   const [dialogOpen, setDialogOpen]         = useState(false);
@@ -40,7 +42,7 @@ export default function MateriasPage() {
 
   const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Materia>(fetchFn);
 
-  const handleBuscar = () => { setBusquedaActiva(busqueda); cargar(1); };
+  const handleBuscar = () => setBusquedaActiva(busqueda.trim());
 
   const abrirCrear = () => {
     setEditando(null);
@@ -114,6 +116,7 @@ export default function MateriasPage() {
       label: 'Acciones', width: '100px',
       render: (m: Materia) => (
         <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Ver detalle"><IconButton size="small" onClick={() => setDetalleId(m.idMateria)}><Visibility fontSize="small" /></IconButton></Tooltip>
           <Tooltip title="Editar">
             <IconButton size="small" color="primary" onClick={() => abrirEditar(m)}>
               <Edit fontSize="small" />
@@ -159,6 +162,7 @@ export default function MateriasPage() {
           }}
         />
         <Button variant="outlined" onClick={handleBuscar}>Buscar</Button>
+        <Button variant="outlined" onClick={() => { setBusqueda(''); setBusquedaActiva(''); }}>Limpiar</Button>
       </Box>
 
       <TablaBase
@@ -189,6 +193,10 @@ export default function MateriasPage() {
             rows={3}
             helperText="Opcional"
           />
+          {editando && <FormControlLabel
+            control={<Switch checked={form.activo} onChange={(e) => setForm(p => ({ ...p, activo: e.target.checked }))} />}
+            label={form.activo ? 'Materia activa' : 'Materia inactiva'}
+          />}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={cerrarDialog}>Cancelar</Button>
@@ -197,6 +205,7 @@ export default function MateriasPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <MateriaDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

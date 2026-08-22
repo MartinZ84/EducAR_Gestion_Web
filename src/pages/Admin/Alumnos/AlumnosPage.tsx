@@ -3,23 +3,24 @@ import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, IconButton, InputAdornment, TextField,
   Tooltip, Typography, Alert, List, ListItem, ListItemText,
-  Paper, Grid,
+  Paper, Grid, Table, TableBody, TableCell, TableHead, TableRow,
 } from '@mui/material';
 import {
-  Add, Delete, Edit, Search, Phone, Home, Person, Clear as ClearIcon
+  Add, Delete, Edit, Search, Phone, Home, Person, Visibility, Clear as ClearIcon
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import TablaBase from '../../../components/common/TablaBase';
 import { usePaginado } from '../../../hooks/usePaginado';
 import {
-  getAlumnos, createAlumno, updateAlumno, deleteAlumno
+  getAlumnos, getAlumno, createAlumno, updateAlumno, deleteAlumno
 } from '../../../api/alumnosApi';
 import {
   getTelefonosPorAlumno, createTelefono, deleteTelefono,
-  TelefonoContacto
+  updateTelefono, TelefonoContacto
 } from '../../../api/telefonosApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { Alumno } from '../../../types';
+import AlumnoDetalleModal from '../../../components/modals/AlumnoDetalleModal';
 
 interface FormAlumno {
   dni: string;
@@ -46,6 +47,7 @@ interface FormErrors {
 interface TelefonoForm {
   idTelefono?: number;
   numero: string;
+  des: string;
   esNuevo: boolean;
 }
 
@@ -56,6 +58,7 @@ const FORM_INICIAL: FormAlumno = {
 };
 
 export default function AlumnosPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [busquedaActiva, setBusquedaActiva] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -67,6 +70,7 @@ export default function AlumnosPage() {
 
   const [telefonos, setTelefonos] = useState<TelefonoForm[]>([]);
   const [nuevoTelefono, setNuevoTelefono] = useState('');
+  const [nuevoTelefonoDescripcion, setNuevoTelefonoDescripcion] = useState('');
   const [cargandoTelefonos, setCargandoTelefonos] = useState(false);
 
   const fetchFn = useCallback(
@@ -94,48 +98,49 @@ export default function AlumnosPage() {
 
   const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado(fetchFn);
 
-  const handleBuscar = () => {
-    setBusquedaActiva(busqueda);
-    cargar(1);
-  };
+  const handleBuscar = () => setBusquedaActiva(busqueda.trim());
 
   const abrirCrear = () => {
     setEditando(null);
     setForm(FORM_INICIAL);
     setTelefonos([]);
     setNuevoTelefono('');
+    setNuevoTelefonoDescripcion('');
     setCampoErrors({});
     setFormError('');
     setDialogOpen(true);
   };
 
   const abrirEditar = async (a: Alumno) => {
-    setEditando(a);
+    let alumno = a;
+    try {
+      alumno = await getAlumno(a.idAlumno);
+    } catch (err) {
+      setFormError(extraerMensajeError(err));
+    }
+    setEditando(alumno);
     setForm({
-      dni: String(a.dni),
-      nombre: a.nombre,
-      apellido: a.apellido,
-      fechaNacimiento: a.fechaNacimiento
-        ? dayjs(a.fechaNacimiento).format('YYYY-MM-DD')
+      dni: String(alumno.dni),
+      nombre: alumno.nombre,
+      apellido: alumno.apellido,
+      fechaNacimiento: alumno.fechaNacimiento
+        ? dayjs(alumno.fechaNacimiento).format('YYYY-MM-DD')
         : '',
-      activo: a.activo,
-      calle: a.calle ?? '',
-      numero: a.numero ?? '',
-      piso: a.piso ?? '',
-      departamento: a.departamento ?? '',
-      barrio: a.barrio ?? '',
-      localidad: a.localidad ?? '',
-      provincia: a.provincia ?? '',
+      activo: alumno.activo,
+      calle: alumno.calle ?? '', numero: alumno.numero ?? '', piso: alumno.piso ?? '',
+      departamento: alumno.departamento ?? '', barrio: alumno.barrio ?? '',
+      localidad: alumno.localidad ?? '', provincia: alumno.provincia ?? '',
     });
     setCampoErrors({});
     setFormError('');
     setNuevoTelefono('');
+    setNuevoTelefonoDescripcion('');
     setDialogOpen(true);
 
     setCargandoTelefonos(true);
     try {
       const tels = await getTelefonosPorAlumno(a.idAlumno);
-      setTelefonos(tels.map((t) => ({ idTelefono: t.idTelefono, numero: t.numero, esNuevo: false })));
+      setTelefonos(tels.map((t) => ({ idTelefono: t.idTelefono, numero: t.numero, des: t.des ?? '', esNuevo: false })));
     } catch {
       setTelefonos([]);
     } finally {
@@ -158,8 +163,9 @@ export default function AlumnosPage() {
       setFormError('Ese número ya está agregado.');
       return;
     }
-    setTelefonos((prev) => [...prev, { numero: limpio, esNuevo: true }]);
+    setTelefonos((prev) => [...prev, { numero: limpio, des: nuevoTelefonoDescripcion.trim(), esNuevo: true }]);
     setNuevoTelefono('');
+    setNuevoTelefonoDescripcion('');
     setFormError('');
   };
 
@@ -177,9 +183,10 @@ export default function AlumnosPage() {
   };
 
   const sincronizarTelefonos = async (idAlumno: number) => {
-    const nuevos = telefonos.filter((t) => t.esNuevo);
-    for (const tel of nuevos) {
-      await createTelefono({ idAlumno, numero: tel.numero });
+    for (const tel of telefonos) {
+      const dto = { idAlumno, numero: tel.numero, des: tel.des || undefined };
+      if (tel.esNuevo) await createTelefono(dto);
+      else if (tel.idTelefono) await updateTelefono(tel.idTelefono, dto);
     }
   };
 
@@ -223,6 +230,7 @@ export default function AlumnosPage() {
 
       if (editando) {
         await updateAlumno(editando.idAlumno, {
+          dni: Number(form.dni),
           ...dtoBase,
           activo: form.activo,
         });
@@ -257,7 +265,15 @@ export default function AlumnosPage() {
   };
 
   const domicilioResumido = (a: Alumno) => {
-    const partes = [a.calle, a.numero, a.barrio, a.localidad].filter(Boolean);
+    const partes = [
+      a.calle,
+      a.numero,
+      a.piso && `Piso ${a.piso}`,
+      a.departamento && `Dto. ${a.departamento}`,
+      a.barrio,
+      a.localidad,
+      a.provincia,
+    ].filter(Boolean);
     return partes.length > 0 ? partes.join(', ') : '—';
   };
 
@@ -301,6 +317,7 @@ export default function AlumnosPage() {
       align: 'center' as const,
       render: (a: Alumno) => (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
+          <Tooltip title="Ver detalle"><IconButton onClick={() => setDetalleId(a.idAlumno)} size="small"><Visibility fontSize="small" /></IconButton></Tooltip>
           <Tooltip title="Editar">
             <IconButton onClick={() => abrirEditar(a)} size="small"><Edit fontSize="small" /></IconButton>
           </Tooltip>
@@ -353,7 +370,6 @@ export default function AlumnosPage() {
           onClick={() => {
             setBusqueda('');
             setBusquedaActiva('');
-            cargar(1);
           }}
           size="medium"          
         >
@@ -429,8 +445,8 @@ export default function AlumnosPage() {
                     setCampoErrors((p) => ({ ...p, dni: undefined }));
                   }}
                   error={!!campoErrors.dni}
-                  helperText={campoErrors.dni ?? (editando ? 'El DNI no se puede modificar.' : '')}
-                  disabled={!!editando}
+                  helperText={campoErrors.dni}
+                  disabled={false}
                   fullWidth
                 />
               </Grid>
@@ -547,6 +563,13 @@ export default function AlumnosPage() {
                 onKeyDown={(e) => e.key === 'Enter' && agregarTelefono()}
                 fullWidth
               />
+              <TextField
+                size="small"
+                placeholder="Descripción (ej. mamá)"
+                value={nuevoTelefonoDescripcion}
+                onChange={(e) => setNuevoTelefonoDescripcion(e.target.value)}
+                fullWidth
+              />
               <Button variant="outlined" onClick={agregarTelefono} size="medium">
                 Agregar
               </Button>
@@ -562,27 +585,26 @@ export default function AlumnosPage() {
               </Typography>
             ) : (
               <Paper variant="outlined" sx={{ borderRadius: 2 }}>
-                <List dense>
+                <Table size="small">
+                  <TableHead><TableRow><TableCell>Teléfono</TableCell><TableCell>Descripción</TableCell><TableCell align="right">Acción</TableCell></TableRow></TableHead>
+                  <TableBody>
                   {telefonos.map((tel, idx) => (
-                    <ListItem
+                    <TableRow
                       key={`${tel.idTelefono ?? 'nuevo'}-${idx}`}
-                      secondaryAction={
-                        <Tooltip title="Quitar">
-                          <IconButton
-                            edge="end"
-                            size="small"
-                            color="error"
-                            onClick={() => quitarTelefono(idx)}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      }
                     >
-                      <ListItemText primary={tel.numero} />
-                    </ListItem>
+                      <TableCell>{tel.numero}</TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          value={tel.des}
+                          onChange={(e) => setTelefonos((prev) => prev.map((item, itemIndex) => itemIndex === idx ? { ...item, des: e.target.value } : item))}
+                        />
+                      </TableCell>
+                      <TableCell align="right"><Tooltip title="Quitar"><IconButton size="small" color="error" onClick={() => quitarTelefono(idx)}><Delete fontSize="small" /></IconButton></Tooltip></TableCell>
+                    </TableRow>
                   ))}
-                </List>
+                  </TableBody>
+                </Table>
               </Paper>
             )}
           </Box>
@@ -600,6 +622,7 @@ export default function AlumnosPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <AlumnoDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

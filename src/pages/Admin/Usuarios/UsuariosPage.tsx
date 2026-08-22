@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, InputAdornment, MenuItem,
-  TextField, Tooltip, Typography, Alert
+  TextField, Tooltip, Typography, Alert, FormControlLabel, Switch
 } from '@mui/material';
 import { Add, Edit, Search, Visibility, VisibilityOff, Clear } from '@mui/icons-material';
 import TablaBase from '../../../components/common/TablaBase';
@@ -12,6 +12,7 @@ import api from '../../../api/axios';
 import { ResultadoPaginado } from '../../../types';
 import { getRoles, Rol } from '../../../api/rolesApi';
 import { useAuth } from '../../../context/AuthContext';
+import UsuarioDetalleModal from '../../../components/modals/UsuarioDetalleModal';
 
 interface Usuario {
   idUsuario: number;
@@ -96,6 +97,7 @@ const updateUsuario = (id: number, dto: UpdateUsuarioDto) =>
   api.put(`/usuarios/${id}`, dto).then(r => r.data);
 
 export default function UsuariosPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [busquedaActiva, setBusquedaActiva] = useState('');
   const [roles, setRoles] = useState<Rol[]>([]);
@@ -130,11 +132,7 @@ export default function UsuariosPage() {
     [busquedaActiva]
   );
 
-  const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Usuario>(fetchFn);
-
-  useEffect(() => {
-    cargar(1);
-  }, [busquedaActiva]); // Dependencia en busquedaActiva
+  const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Usuario>(fetchFn, 10);
 
   useEffect(() => {
     getRoles()
@@ -152,16 +150,11 @@ export default function UsuariosPage() {
 
   const handleBuscar = () => {
     setBusquedaActiva(busqueda.trim());
-    cargar(1);
   };
 
   const limpiarBusqueda = () => {
   setBusqueda('');
   setBusquedaActiva('');
-  // Recargar con un pequeño retraso para asegurar que el estado se actualizó
-  setTimeout(() => {
-    cargar(1);
-  }, 0);
 };
 
   const abrirCrear = () => {
@@ -260,11 +253,10 @@ export default function UsuariosPage() {
     {
       label: 'Acciones', width: '80px',
       render: (u: Usuario) => (
-        <Tooltip title="Editar">
-          <IconButton size="small" color="primary" onClick={() => abrirEditar(u)}>
-            <Edit fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Ver detalle"><IconButton size="small" onClick={() => setDetalleId(u.idUsuario)}><Visibility fontSize="small" /></IconButton></Tooltip>
+          <Tooltip title="Editar"><IconButton size="small" color="primary" onClick={() => abrirEditar(u)}><Edit fontSize="small" /></IconButton></Tooltip>
+        </Box>
       )
     },
   ];
@@ -327,7 +319,30 @@ export default function UsuariosPage() {
         mensajeVacio="No se encontraron usuarios."
       />
 
-      {/* ... resto del código del diálogo igual */}
+      <Dialog open={dialogOpen} onClose={cerrarDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>{editando ? 'Editar Usuario' : 'Nuevo Usuario'}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+          {formError && <Alert severity="error">{formError}</Alert>}
+          <TextField select label="Rol" value={form.idRol} onChange={(e) => setForm(p => ({ ...p, idRol: e.target.value }))} error={!!campoErrors.idRol} helperText={campoErrors.idRol}>
+            {roles.map((rol) => <MenuItem key={rol.id} value={String(rol.id)}>{rol.nombre}</MenuItem>)}
+          </TextField>
+          <TextField label="DNI" value={form.dni} onChange={(e) => setForm(p => ({ ...p, dni: e.target.value }))} error={!!campoErrors.dni} helperText={campoErrors.dni} />
+          <TextField label="Nombre" value={form.nombre} onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))} error={!!campoErrors.nombre} helperText={campoErrors.nombre} />
+          <TextField label="Apellido" value={form.apellido} onChange={(e) => setForm(p => ({ ...p, apellido: e.target.value }))} error={!!campoErrors.apellido} helperText={campoErrors.apellido} />
+          <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} error={!!campoErrors.email} helperText={campoErrors.email} />
+          {!editando && <>
+            <TextField label="Nombre de usuario" value={form.nombreUsuario} onChange={(e) => setForm(p => ({ ...p, nombreUsuario: e.target.value }))} error={!!campoErrors.nombreUsuario} helperText={campoErrors.nombreUsuario} />
+            <TextField label="Contraseña" type={mostrarPass ? 'text' : 'password'} value={form.contrasena} onChange={(e) => setForm(p => ({ ...p, contrasena: e.target.value }))} error={!!campoErrors.contrasena} helperText={campoErrors.contrasena} />
+          </>}
+          {editando && <FormControlLabel control={<Switch checked={form.activo} onChange={(e) => setForm(p => ({ ...p, activo: e.target.checked }))} />} label={form.activo ? 'Usuario activo' : 'Usuario inactivo'} />}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cerrarDialog} disabled={guardando}>Cancelar</Button>
+          <Button variant="contained" onClick={handleGuardar} disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <UsuarioDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

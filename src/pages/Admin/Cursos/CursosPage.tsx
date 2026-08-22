@@ -2,21 +2,23 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, MenuItem, TextField,
-  Tooltip, Typography, Alert
+  Tooltip, Typography, Alert, FormControlLabel, Switch
 } from '@mui/material';
-import { Add, Delete } from '@mui/icons-material';
+import { Add, Delete, Edit, Visibility } from '@mui/icons-material';
 import TablaBase from '../../../components/common/TablaBase';
 import { usePaginado } from '../../../hooks/usePaginado';
-import { getCursos, createCurso, deleteCurso } from '../../../api/cursosApi';
+import { getCursos, createCurso, updateCurso, deleteCurso } from '../../../api/cursosApi';
 import { getCiclosLectivos } from '../../../api/ciclosLectivosApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { Curso, CicloLectivo } from '../../../types';
+import CursoDetalleModal from '../../../components/modals/CursoDetalleModal';
 
 interface FormCurso {
   idCicloLectivo: string;
   grado: string;
   division: string;
   turno: string;
+  activo: boolean;
 }
 
 interface FormErrors {
@@ -29,12 +31,14 @@ const TURNOS = ['Mañana', 'Tarde', 'Noche'];
 const GRADOS = [1, 2, 3, 4, 5, 6, 7];
 
 const FORM_INICIAL: FormCurso = {
-  idCicloLectivo: '', grado: '', division: '', turno: 'Mañana'
+  idCicloLectivo: '', grado: '', division: '', turno: 'Mañana', activo: true
 };
 
 export default function CursosPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [filtroCiclo, setFiltroCiclo] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editando, setEditando] = useState<Curso | null>(null);
   const [form, setForm] = useState<FormCurso>(FORM_INICIAL);
   const [campoErrors, setCampoErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
@@ -57,7 +61,16 @@ export default function CursosPage() {
   const { datos, pagina, totalPaginas, cargando, error, cargar, recargar } = usePaginado<Curso>(fetchFn);
 
   const abrirCrear = () => {
+    setEditando(null);
     setForm(FORM_INICIAL);
+    setCampoErrors({});
+    setFormError('');
+    setDialogOpen(true);
+  };
+
+  const abrirEditar = (curso: Curso) => {
+    setEditando(curso);
+    setForm({ idCicloLectivo: String(curso.idCicloLectivo), grado: String(curso.grado), division: curso.division, turno: curso.turno ?? '', activo: curso.activo });
     setCampoErrors({});
     setFormError('');
     setDialogOpen(true);
@@ -83,12 +96,11 @@ export default function CursosPage() {
     setCampoErrors({});
 
     try {
-      await createCurso({
-        idCicloLectivo: Number(form.idCicloLectivo),
-        grado: Number(form.grado),
-        division: form.division.toUpperCase(),
-        turno: form.turno || undefined,
-      });
+      if (editando) {
+        await updateCurso(editando.idCurso, { grado: Number(form.grado), division: form.division.toUpperCase(), turno: form.turno || undefined, activo: form.activo });
+      } else {
+        await createCurso({ idCicloLectivo: Number(form.idCicloLectivo), grado: Number(form.grado), division: form.division.toUpperCase(), turno: form.turno || undefined });
+      }
       cerrarDialog();
       recargar();
     } catch (err) {
@@ -119,11 +131,11 @@ export default function CursosPage() {
     {
       label: 'Acciones', width: '80px',
       render: (c: Curso) => (
-        <Tooltip title="Dar de baja">
-          <IconButton size="small" color="error" onClick={() => handleEliminar(c)}>
-            <Delete fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Ver detalle"><IconButton size="small" onClick={() => setDetalleId(c.idCurso)}><Visibility fontSize="small" /></IconButton></Tooltip>
+          <Tooltip title="Editar"><IconButton size="small" onClick={() => abrirEditar(c)}><Edit fontSize="small" /></IconButton></Tooltip>
+          <Tooltip title="Dar de baja"><IconButton size="small" color="error" onClick={() => handleEliminar(c)}><Delete fontSize="small" /></IconButton></Tooltip>
+        </Box>
       )
     },
   ];
@@ -169,11 +181,11 @@ export default function CursosPage() {
       />
 
       <Dialog open={dialogOpen} onClose={cerrarDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Nuevo Curso</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{editando ? 'Editar Curso' : 'Nuevo Curso'}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
           {formError && <Alert severity="error">{formError}</Alert>}
 
-          <TextField
+          {!editando && <TextField
             select
             label="Ciclo Lectivo *"
             value={form.idCicloLectivo}
@@ -186,7 +198,7 @@ export default function CursosPage() {
                 {c.anio}
               </MenuItem>
             ))}
-          </TextField>
+          </TextField>}
 
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
@@ -223,14 +235,16 @@ export default function CursosPage() {
               <MenuItem key={t} value={t}>{t}</MenuItem>
             ))}
           </TextField>
+          {editando && <FormControlLabel control={<Switch checked={form.activo} onChange={(e) => setForm(p => ({ ...p, activo: e.target.checked }))} />} label={form.activo ? 'Curso activo' : 'Curso inactivo'} />}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={cerrarDialog}>Cancelar</Button>
           <Button variant="contained" onClick={handleGuardar} disabled={guardando}>
-            {guardando ? 'Guardando...' : 'Guardar Curso'}
+            {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Guardar Curso'}
           </Button>
         </DialogActions>
       </Dialog>
+      <CursoDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

@@ -3,7 +3,7 @@ import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, TextField, Tooltip, Typography, Alert
 } from '@mui/material';
-import { Add, Edit } from '@mui/icons-material';
+import { Add, Edit, Visibility } from '@mui/icons-material';
 import TablaBase from '../../../components/common/TablaBase';
 import {
   getCiclosLectivos, createCicloLectivo, updateCicloLectivo
@@ -11,6 +11,7 @@ import {
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { CicloLectivo } from '../../../types';
 import { toApiDateTime } from '../../../utils/dateUtils';
+import CicloLectivoDetalleModal from '../../../components/modals/CicloLectivoDetalleModal';
 
 interface FormCiclo {
   anio:        string;
@@ -30,6 +31,7 @@ const FORM_INICIAL: FormCiclo = {
 };
 
 export default function CiclosLectivosPage() {
+  const [detalleId, setDetalleId] = useState<number | null>(null);
   const [ciclos, setCiclos]           = useState<CicloLectivo[]>([]);
   const [cargando, setCargando]       = useState(false);
   const [dialogOpen, setDialogOpen]   = useState(false);
@@ -148,11 +150,10 @@ export default function CiclosLectivosPage() {
     {
       label: 'Acciones', width: '80px',
       render: (c: CicloLectivo) => (
-        <Tooltip title="Editar">
-          <IconButton size="small" color="primary" onClick={() => abrirEditar(c)}>
-            <Edit fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Ver detalle"><IconButton size="small" onClick={() => setDetalleId(c.idCicloLectivo)}><Visibility fontSize="small" /></IconButton></Tooltip>
+          <Tooltip title="Editar"><IconButton size="small" color="primary" onClick={() => abrirEditar(c)}><Edit fontSize="small" /></IconButton></Tooltip>
+        </Box>
       )
     },
   ];
@@ -227,6 +228,7 @@ export default function CiclosLectivosPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <CicloLectivoDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
     </Box>
   );
 }

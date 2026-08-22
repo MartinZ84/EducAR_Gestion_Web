@@ -1,5 +1,5 @@
 import api from './axios';
-import { ResultadoPaginado, Tutor } from '../types';
+import { ResultadoPaginado, Tutor, TutorDetalle } from '../types';
 
 export const getTutores = async (
   pagina = 1,
@@ -31,6 +31,7 @@ export const createTutor = async (dto: {
 };
 
 export const updateTutor = async (id: number, dto: {
+  dni: number;
   nombre: string;
   apellido: string;
   email: string;
@@ -43,4 +44,9 @@ export const updateTutor = async (id: number, dto: {
 
 export const deleteTutor = async (id: number) => {
   await api.delete(`/tutores/${id}`);
+};
+
+export const getTutorDetalle = async (id: number) => {
+  const res = await api.get<TutorDetalle>(`/tutores/${id}/detalle`);
+  return res.data;
 };

@@ -20,6 +20,16 @@ import { extraerMensajeError } from '../../../utils/apiErrors';
 
 const CANTIDAD_POR_PAGINA = 10;
 
+const calcularEdad = (fechaNacimiento?: string | null) => {
+  if (!fechaNacimiento) return '—';
+  const nacimiento = new Date(fechaNacimiento);
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const cumpleEsteAno = new Date(hoy.getFullYear(), nacimiento.getMonth(), nacimiento.getDate());
+  if (hoy < cumpleEsteAno) edad -= 1;
+  return edad >= 0 ? String(edad) : '—';
+};
+
 export default function MatriculasPage() {
   // ─── Selectores ───
   const [ciclos, setCiclos] = useState<CicloLectivo[]>([]);
@@ -77,7 +87,7 @@ export default function MatriculasPage() {
     setSeleccionados(new Set());
     setTodosSeleccionadosPagina(false);
     setPagina(1);
-    if (!idCurso || !idCiclo) {
+    if (!idCiclo) {
       setAlumnos([]);
       setTotalPaginas(1);
       return;
@@ -88,7 +98,7 @@ export default function MatriculasPage() {
 
   const cargarAlumnos = useCallback(
     async (p: number) => {
-      if (!idCurso || !idCiclo) return;
+      if (!idCiclo) return;
       setCargandoAlumnos(true);
       setError('');
       setTodosSeleccionadosPagina(false);
@@ -308,20 +318,22 @@ export default function MatriculasPage() {
               <TableCell sx={{ color: 'white', fontWeight: 600 }}>Nombre</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 600 }}>DNI</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 600 }}>Fec. Nac.</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Edad</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 600 }}>Estado</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {cargandoAlumnos ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : alumnos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                   {idCurso
-                    ? 'No hay alumnos disponibles para matricular en este curso.'
+                    ? 'No hay alumnos activos para mostrar en este ciclo lectivo.'
                     : 'Seleccioná un ciclo lectivo y un curso para ver los alumnos disponibles.'}
                 </TableCell>
               </TableRow>
@@ -342,9 +354,13 @@ export default function MatriculasPage() {
                   <TableCell>{alumno.nombre}</TableCell>
                   <TableCell>{alumno.dni.toLocaleString('es-AR')}</TableCell>
                   <TableCell>
-                    {alumno.fechaNacimiento
-                      ? dayjs(alumno.fechaNacimiento).format('DD/MM/YYYY')
+                    {alumno.fecNac
+                      ? dayjs(alumno.fecNac).format('DD/MM/YYYY')
                       : '—'}
+                  </TableCell>
+                  <TableCell>{calcularEdad(alumno.fecNac)}</TableCell>
+                  <TableCell>
+                    {alumno.matriculado ? <Chip size="small" color="success" label={alumno.cursoActual || 'Ya asignado'} /> : <Chip size="small" variant="outlined" label="Sin matrícula" />}
                   </TableCell>
                 </TableRow>
               ))

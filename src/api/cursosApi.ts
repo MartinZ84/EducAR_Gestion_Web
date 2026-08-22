@@ -1,5 +1,5 @@
 import api from './axios';
-import { ResultadoPaginado, Curso } from '../types';
+import { ResultadoPaginado, Curso, CursoDetalle } from '../types';
 
 export const getCursos = async (pagina = 1, cantidad = 10, idCicloLectivo?: number) => {
   const res = await api.get<ResultadoPaginado<Curso>>('/cursos', {
@@ -18,8 +18,19 @@ export const createCurso = async (dto: {
 export const deleteCurso = async (id: number) => {
   await api.delete(`/cursos/${id}`);
 };
+
+export const updateCurso = async (id: number, dto: {
+  grado: number; division: string; turno?: string; activo: boolean;
+}) => {
+  await api.put(`/cursos/${id}`, dto);
+};
 export const getCurso = async (id: number) => {
   const res = await api.get<Curso>(`/Cursos/${id}`);
+  return res.data;
+};
+
+export const getCursoDetalle = async (id: number) => {
+  const res = await api.get<CursoDetalle>(`/cursos/${id}/detalle`);
   return res.data;
 };
 
