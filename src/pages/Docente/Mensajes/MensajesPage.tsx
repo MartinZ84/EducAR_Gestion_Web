@@ -4,42 +4,41 @@ import {
   Dialog, DialogActions, DialogContent, DialogTitle,
   TextField, Alert, CircularProgress, List, ListItem,
   ListItemText, ListItemAvatar, Avatar, Chip, Divider,
-  Tab, Tabs, IconButton, Tooltip, MenuItem
+  Tab, Tabs, IconButton, Tooltip, Autocomplete
 } from '@mui/material';
 import { Send, Email, Drafts, Reply } from '@mui/icons-material';
 import {
   getMensajesRecibidos, getMensajesEnviados,
-  getMensaje, enviarMensaje, marcarLeido
+  getMensaje, enviarMensaje, marcarLeido, getDestinatariosMensaje, DestinatarioMensaje
 } from '../../../api/mensajesApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { MensajeResumen, Mensaje } from '../../../types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
-import api from '../../../api/axios';
+import { useAuth } from '../../../context/AuthContext';
 
 dayjs.locale('es');
 
 interface FormMensaje {
-  idDestinatario: string;
   asunto:         string;
   texto:          string;
 }
 
-interface Usuario {
-  idUsuario:      number;
-  nombreCompleto: string;
-  rol:            string;
-}
-
 export default function MensajesPage() {
+  const { usuario } = useAuth();
   const [tabActiva, setTabActiva]       = useState(0);
   const [recibidos, setRecibidos]       = useState<MensajeResumen[]>([]);
   const [enviados, setEnviados]         = useState<MensajeResumen[]>([]);
+  const [paginaRecibidos, setPaginaRecibidos] = useState(1);
+  const [paginaEnviados, setPaginaEnviados] = useState(1);
+  const [totalPaginasRecibidos, setTotalPaginasRecibidos] = useState(1);
+  const [totalPaginasEnviados, setTotalPaginasEnviados] = useState(1);
   const [detalle, setDetalle]           = useState<Mensaje | null>(null);
   const [detalleOpen, setDetalleOpen]   = useState(false);
   const [nuevoOpen, setNuevoOpen]       = useState(false);
-  const [usuarios, setUsuarios]         = useState<Usuario[]>([]);
-  const [form, setForm]                 = useState<FormMensaje>({ idDestinatario: '', asunto: '', texto: '' });
+  const [usuarios, setUsuarios]         = useState<DestinatarioMensaje[]>([]);
+  const [form, setForm]                 = useState<FormMensaje>({ asunto: '', texto: '' });
+  const [destinatariosSeleccionados, setDestinatariosSeleccionados] = useState<DestinatarioMensaje[]>([]);
   const [cargando, setCargando]         = useState(false);
   const [enviando, setEnviando]         = useState(false);
   const [error, setError]               = useState('');
@@ -49,8 +48,12 @@ export default function MensajesPage() {
 
   const cargarMensajes = () => {
     setCargando(true);
-    Promise.all([getMensajesRecibidos(), getMensajesEnviados()])
-      .then(([r, e]) => { setRecibidos(r); setEnviados(e); })
+    Promise.all([getMensajesRecibidos(paginaRecibidos), getMensajesEnviados(paginaEnviados)])
+      .then(([r, e]) => {
+        setRecibidos(r.datos); setEnviados(e.datos);
+        setTotalPaginasRecibidos(r.totalPaginas || 1);
+        setTotalPaginasEnviados(e.totalPaginas || 1);
+      })
       .catch(() => setError('Error al cargar mensajes.'))
       .finally(() => setCargando(false));
   };
@@ -58,10 +61,14 @@ export default function MensajesPage() {
   useEffect(() => {
     cargarMensajes();
     // Carga usuarios para el selector de destinatario
-    api.get<{ datos: Usuario[] }>('/usuarios', { params: { pagina: 1, cantidad: 100 } })
-      .then(r => setUsuarios(r.data.datos ?? []))
+    getDestinatariosMensaje()
+      .then(setUsuarios)
       .catch((err) => setUsuariosError(extraerMensajeError(err)));
-  }, []);
+    // Refresca las bandejas cada 15 segundos. Es un sondeo de bajo costo que
+    // permite ver mensajes nuevos sin recargar manualmente la pantalla.
+    const intervalo = window.setInterval(cargarMensajes, 15000);
+    return () => window.clearInterval(intervalo);
+  }, [paginaRecibidos, paginaEnviados]);
 
   const verDetalle = async (m: MensajeResumen) => {
     try {
@@ -69,9 +76,10 @@ export default function MensajesPage() {
       setDetalle(data);
       setDetalleOpen(true);
       // Marcar como leído si está en recibidos y no estaba leído
-      if (!m.leido) {
+      if (tabActiva === 0 && !m.leido) {
         await marcarLeido(m.idMensaje);
         setRecibidos(prev => prev.map(r => r.idMensaje === m.idMensaje ? { ...r, leido: true } : r));
+        window.dispatchEvent(new Event('mensajes-actualizados'));
       }
     } catch {
       setError('Error al cargar el mensaje.');
@@ -79,13 +87,9 @@ export default function MensajesPage() {
   };
 
   const handleEnviar = async () => {
-    if (!form.idDestinatario) { setFormError('Seleccioná un destinatario.'); return; }
+    if (destinatariosSeleccionados.length === 0) { setFormError('Seleccioná al menos un destinatario.'); return; }
     if (!form.asunto.trim())  { setFormError('El asunto es obligatorio.'); return; }
     if (!form.texto.trim())   { setFormError('El mensaje no puede estar vacío.'); return; }
-    if (form.asunto.length > 200) { setFormError('El asunto no puede superar 200 caracteres.'); return; }
-    if (form.texto.length > 2000) { setFormError('El mensaje no puede superar 2000 caracteres.'); return; }
-    if (form.asunto.length > 200) { setFormError('El asunto no puede superar 200 caracteres.'); return; }
-    if (form.texto.length > 2000) { setFormError('El mensaje no puede superar 2000 caracteres.'); return; }
     if (form.asunto.length > 200) { setFormError('El asunto no puede superar 200 caracteres.'); return; }
     if (form.texto.length > 2000) { setFormError('El mensaje no puede superar 2000 caracteres.'); return; }
 
@@ -93,12 +97,16 @@ export default function MensajesPage() {
     setFormError('');
     try {
       await enviarMensaje({
-        idUsuarioDestinat: Number(form.idDestinatario),
+        // El selector puede contener varias filas del mismo tutor si representa
+        // a más de un alumno. Set evita enviarle el mismo mensaje dos veces.
+        idsUsuariosDestinatarios: [...new Set(destinatariosSeleccionados.map(d => d.idUsuario))],
         asunto:            form.asunto,
         mensajeTexto:      form.texto,
       });
       setNuevoOpen(false);
-      setForm({ idDestinatario: '', asunto: '', texto: '' });
+      setForm({ asunto: '', texto: '' });
+      setDestinatariosSeleccionados([]);
+      window.dispatchEvent(new Event('mensajes-actualizados'));
       cargarMensajes();
     } catch (err) {
       setFormError(extraerMensajeError(err));
@@ -108,6 +116,22 @@ export default function MensajesPage() {
   };
 
   const mensajesActivos = tabActiva === 0 ? recibidos : enviados;
+  const responder = () => {
+    if (!detalle || detalle.idUsuarioDestinat !== usuario?.idUsuario) return;
+    const destinatario = usuarios.find((u) => u.idUsuario === detalle.idUsuarioRemitente);
+    setDestinatariosSeleccionados(destinatario ? [destinatario] : []);
+    setForm({ asunto: `Re: ${detalle.asunto}`, texto: '' });
+    setDetalleOpen(false);
+    setFormError('');
+    setNuevoOpen(true);
+  };
+  const abrirNuevo = () => {
+    setNuevoOpen(true);
+    setFormError('');
+    setUsuariosError('');
+    getDestinatariosMensaje().then(setUsuarios)
+      .catch((err) => setUsuariosError(extraerMensajeError(err)));
+  };
 
   // Formatea la fecha de forma legible
   const formatFecha = (fecha: string) =>
@@ -125,15 +149,13 @@ export default function MensajesPage() {
         <Button
           variant="contained"
           startIcon={<Send />}
-          onClick={() => { setNuevoOpen(true); setFormError(''); }}
+          onClick={abrirNuevo}
         >
           Nuevo Mensaje
         </Button>
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {usuariosError && <Alert severity="warning" sx={{ mb: 2 }}>{usuariosError}</Alert>}
-      {usuariosError && <Alert severity="warning" sx={{ mb: 2 }}>{usuariosError}</Alert>}
       {usuariosError && <Alert severity="warning" sx={{ mb: 2 }}>{usuariosError}</Alert>}
 
       <Card>
@@ -238,6 +260,16 @@ export default function MensajesPage() {
         )}
       </Card>
 
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+        <Button disabled={(tabActiva === 0 ? paginaRecibidos : paginaEnviados) <= 1} onClick={() =>
+          tabActiva === 0 ? setPaginaRecibidos(p => p - 1) : setPaginaEnviados(p => p - 1)
+        }>Anterior</Button>
+        <Typography variant="body2">Página {tabActiva === 0 ? paginaRecibidos : paginaEnviados} de {tabActiva === 0 ? totalPaginasRecibidos : totalPaginasEnviados}</Typography>
+        <Button disabled={(tabActiva === 0 ? paginaRecibidos >= totalPaginasRecibidos : paginaEnviados >= totalPaginasEnviados)} onClick={() =>
+          tabActiva === 0 ? setPaginaRecibidos(p => p + 1) : setPaginaEnviados(p => p + 1)
+        }>Siguiente</Button>
+      </Box>
+
       {/* Dialog detalle del mensaje */}
       <Dialog open={detalleOpen} onClose={() => setDetalleOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>
@@ -262,6 +294,9 @@ export default function MensajesPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
+          {detalle?.idUsuarioDestinat === usuario?.idUsuario &&
+            usuarios.some((u) => u.idUsuario === detalle?.idUsuarioRemitente) &&
+            <Button startIcon={<Reply />} onClick={responder}>Responder</Button>}
           <Button onClick={() => setDetalleOpen(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
@@ -272,18 +307,25 @@ export default function MensajesPage() {
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
           {formError && <Alert severity="error">{formError}</Alert>}
 
-          <TextField
-            select
-            label="Destinatario *"
-            value={form.idDestinatario}
-            onChange={(e) => setForm(p => ({ ...p, idDestinatario: e.target.value }))}
-          >
-            {usuarios.map((u) => (
-              <MenuItem key={u.idUsuario} value={String(u.idUsuario)}>
-                {u.nombreCompleto} ({u.rol})
-              </MenuItem>
-            ))}
-          </TextField>
+          <Autocomplete
+            // "multiple" permite seleccionar varios tutores o docentes antes de enviar.
+            multiple
+            options={usuarios}
+            value={destinatariosSeleccionados}
+            onChange={(_, value) => setDestinatariosSeleccionados(value)}
+            getOptionLabel={(u) => `${u.nombreAlumno} — ${u.nombreCompleto}`}
+            isOptionEqualToValue={(a, b) => a.idUsuario === b.idUsuario && a.idAlumno === b.idAlumno}
+            filterOptions={(options, state) => {
+              const texto = state.inputValue.toLocaleLowerCase('es');
+              return options.filter(u => `${u.nombreAlumno} ${u.nombreCompleto}`.toLocaleLowerCase('es').includes(texto));
+            }}
+            renderOption={(props, u) => <li {...props} key={`${u.idAlumno}-${u.idUsuario}`}><Box><Typography sx={{ fontWeight: 600 }}>{u.nombreAlumno}</Typography><Typography variant="body2" color="text.secondary">{u.rol}: {u.nombreCompleto}</Typography></Box></li>}
+            renderInput={(params) => <TextField {...params} label="Alumno y destinatario *" placeholder="Buscar por nombre o apellido" />}
+          />
+          {/* Seleccionar todos toma una sola opción por usuario. La API ya devuelve
+              únicamente destinatarios vinculados durante el ciclo lectivo actual. */}
+          {usuarios.length > 0 && <Box sx={{ display:'flex', gap:1 }}><Button size="small" onClick={() => setDestinatariosSeleccionados([...new Map(usuarios.map(u => [u.idUsuario, u])).values()])}>Seleccionar todos</Button><Button size="small" onClick={() => setDestinatariosSeleccionados([])}>Limpiar</Button></Box>}
+          {usuarios.length === 0 && <Typography variant="body2" color="text.secondary">No hay destinatarios vinculados en el ciclo lectivo actual.</Typography>}
 
           <TextField
             label="Asunto *"
@@ -308,4 +350,4 @@ export default function MensajesPage() {
       </Dialog>
     </Box>
   );
-} 
+}

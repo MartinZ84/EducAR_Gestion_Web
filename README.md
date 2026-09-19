@@ -187,7 +187,13 @@ El acceso se controla mediante `ProtectedRoute` según el rol recibido durante e
 
 ### Tutor
 
-La ruta está preparada y el módulo continúa en desarrollo.
+- Consulta de asistencia y calificaciones de todos sus alumnos vinculados.
+- Notas por evaluación y promedio final por materia y período.
+- Mensajes con docentes vinculados a sus alumnos en el ciclo lectivo activo del año actual.
+
+Los mensajes anteriores siguen disponibles aunque ya no se pueda escribir a sus remitentes.
+La API requiere aplicar la migración `AddEvaluacionesYNotas` antes de cargar evaluaciones.
+La carga de notas se realiza en `/api/evaluaciones`; `POST /api/Calificaciones` ya no está disponible.
 
 ## 9. Asignaciones académicas
 

@@ -11,10 +11,11 @@ type DetalleModalProps<T> = {
   title: string;
   load: (id: number) => Promise<T>;
   onClose: () => void;
+  reloadKey?: number;
   children: (data: T) => ReactNode;
 };
 
-export default function DetalleModal<T>({ open, id, title, load, onClose, children }: DetalleModalProps<T>) {
+export default function DetalleModal<T>({ open, id, title, load, onClose, reloadKey = 0, children }: DetalleModalProps<T>) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export default function DetalleModal<T>({ open, id, title, load, onClose, childr
       .catch((err) => { if (activo) setError(extraerMensajeError(err)); })
       .finally(() => { if (activo) setLoading(false); });
     return () => { activo = false; };
-  }, [open, id, load]);
+  }, [open, id, load, reloadKey]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>

@@ -21,6 +21,7 @@ import {
 import { extraerMensajeError } from '../../../utils/apiErrors';
 import { Alumno } from '../../../types';
 import AlumnoDetalleModal from '../../../components/modals/AlumnoDetalleModal';
+import TutorAsignacionModal from '../../../components/modals/TutorAsignacionModal';
 
 interface FormAlumno {
   dni: string;
@@ -67,6 +68,7 @@ export default function AlumnosPage() {
   const [campoErrors, setCampoErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const [alumnoNuevo, setAlumnoNuevo] = useState<{ id: number; nombre: string } | null>(null);
 
   const [telefonos, setTelefonos] = useState<TelefonoForm[]>([]);
   const [nuevoTelefono, setNuevoTelefono] = useState('');
@@ -244,6 +246,11 @@ export default function AlumnosPage() {
         if (idNuevoAlumno && telefonos.length > 0) {
           await sincronizarTelefonos(idNuevoAlumno);
         }
+        if (!idNuevoAlumno) throw new Error('La API no devolvió el identificador del alumno creado.');
+        cerrarDialog();
+        setAlumnoNuevo({ id: idNuevoAlumno, nombre: `${form.nombre} ${form.apellido}` });
+        recargar();
+        return;
       }
       cerrarDialog();
       recargar();
@@ -623,6 +630,13 @@ export default function AlumnosPage() {
         </DialogActions>
       </Dialog>
       <AlumnoDetalleModal open={detalleId !== null} id={detalleId} onClose={() => setDetalleId(null)} />
+      <TutorAsignacionModal
+        open={alumnoNuevo !== null}
+        idAlumno={alumnoNuevo?.id ?? null}
+        nombreAlumno={alumnoNuevo?.nombre}
+        obligatorio
+        onClose={() => { setAlumnoNuevo(null); recargar(); }}
+      />
     </Box>
   );
 }

@@ -256,7 +256,7 @@ export default function MatriculasPage() {
           >
             {cursos.map((c) => (
               <MenuItem key={c.idCurso} value={String(c.idCurso)}>
-                {c.anio}° {c.division} {c.turno ? `— ${c.turno}` : ''}
+                {c.anio} · {c.grado}° {c.division} {c.turno ? `— ${c.turno}` : ''}
               </MenuItem>
             ))}
           </Select>

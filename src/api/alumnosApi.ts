@@ -18,8 +18,16 @@ export const getAlumnos = async (
 };
 
 export const getAlumnosPorCurso = async (idCurso: number) => {
-  const res = await api.get(`/AlumnoCurso/curso/${idCurso}`);
-  return res.data;
+  const res = await api.get<{ idAlumno: number; nombreAlumno: string; apellidoAlumno: string; estado: string }[]>(
+    `/Matriculas/curso/${idCurso}`
+  );
+  return res.data
+    .filter((matricula) => matricula.estado === 'Activa')
+    .map((matricula) => ({
+      idAlumno: matricula.idAlumno,
+      nombre: matricula.nombreAlumno,
+      apellido: matricula.apellidoAlumno,
+    }));
 };
 
 export const getAlumno = async (id: number) => {

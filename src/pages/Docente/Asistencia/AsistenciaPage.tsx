@@ -6,14 +6,16 @@ import {
   Alert, Avatar, List, ListItem, ListItemText,
   ListItemAvatar, Switch, FormControlLabel
 } from '@mui/material';
-import { HowToReg, Save } from '@mui/icons-material';
+import { CalendarMonth, HowToReg, Save } from '@mui/icons-material';
 import { getMisCursos, MiCurso } from '../../../api/docenteMateriaCursoApi';
 import { getAsistenciaPorCursoYFecha, registrarAsistencia } from '../../../api/asistenciaApi';
 import { extraerMensajeError } from '../../../utils/apiErrors';
 //import { getAlumnos } from '../../../api/alumnosApi';
 import { getAlumnosPorCurso } from '../../../api/alumnosApi';
-import { Alumno } from '../../../types';
 import dayjs from 'dayjs';
+import { useAuth } from '../../../context/AuthContext';
+import { getCursos } from '../../../api/cursosApi';
+import CalendarioAsistenciaModal, { CursoAsistencia } from '../../../components/modals/CalendarioAsistenciaModal';
 
 interface AlumnoAsistencia {
   idAlumno: number;
@@ -25,9 +27,11 @@ interface AlumnoAsistencia {
 export default function AsistenciaPage() {
   // useLocation: permite recibir estado de navegación (ej: desde MisCursos)
   const location = useLocation();
-  const state    = location.state as { idCurso?: number } | null;
+  const state    = location.state as { idCurso?: number; abrirCalendario?: boolean } | null;
+  const { esAdmin } = useAuth();
 
-  const [cursos, setCursos]         = useState<MiCurso[]>([]);
+  const [cursos, setCursos]         = useState<CursoAsistencia[]>([]);
+  const [calendarioOpen, setCalendarioOpen] = useState(Boolean(state?.abrirCalendario));
   const [idCurso, setIdCurso]       = useState<string>(state?.idCurso ? String(state.idCurso) : '');
   const [fecha, setFecha]           = useState(dayjs().format('YYYY-MM-DD'));
   const [alumnos, setAlumnos]       = useState<AlumnoAsistencia[]>([]);
@@ -35,15 +39,19 @@ export default function AsistenciaPage() {
   const [guardando, setGuardando]   = useState(false);
   const [error, setError]           = useState('');
   const [exito, setExito]           = useState('');
+  const cursosUnicos = cursos.filter((curso, indice) =>
+    cursos.findIndex((otro) => otro.idCurso === curso.idCurso) === indice
+  );
 
   // Carga los cursos del docente al montar
   useEffect(() => {
-    getMisCursos().then(setCursos).catch((err) => setError(extraerMensajeError(err)));
+    if (esAdmin()) getCursos(1, 500).then(r => setCursos(r.datos.filter(c => c.activo && c.anio === new Date().getFullYear()))).catch(err => setError(extraerMensajeError(err)));
+    else getMisCursos().then((r: MiCurso[]) => setCursos(r)).catch((err) => setError(extraerMensajeError(err)));
   }, []);
 
   // Cuando cambia el curso o la fecha, carga la asistencia existente
   useEffect(() => {
-    if (!idCurso) return;
+    if (!idCurso) { setAlumnos([]); return; }
     setCargando(true);
     setError('');
     setExito('');
@@ -51,7 +59,7 @@ export default function AsistenciaPage() {
     // Primero cargamos los alumnos del curso
     getAlumnosPorCurso(Number(idCurso))
       .then(async (alumnosDelCurso) => {
-        const alumnosBase: AlumnoAsistencia[] = alumnosDelCurso.map((a: Alumno) => ({
+        const alumnosBase: AlumnoAsistencia[] = alumnosDelCurso.map((a) => ({
           idAlumno: a.idAlumno,
           nombre:   a.nombre,
           apellido: a.apellido,
@@ -71,12 +79,12 @@ export default function AsistenciaPage() {
           } else {
             setAlumnos(alumnosBase);
           }
-        } catch {
-          // Si no existe un registro para la fecha, se mantiene el valor por defecto.
-          setAlumnos(alumnosBase);
+        } catch (err) {
+          setAlumnos([]);
+          setError(extraerMensajeError(err));
         }
       })
-      .catch(() => setError('Error al cargar los alumnos.'))
+      .catch((err) => { setAlumnos([]); setError(extraerMensajeError(err)); })
       .finally(() => setCargando(false));
   }, [idCurso, fecha]);
 
@@ -118,7 +126,7 @@ export default function AsistenciaPage() {
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Registro de Asistencia</Typography>
+        <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><Typography variant="h5" sx={{ fontWeight: 700 }}>Registro de Asistencia</Typography><Button startIcon={<CalendarMonth />} variant="outlined" onClick={() => setCalendarioOpen(true)}>Ver calendario</Button></Box>
         <Typography variant="body2" color="text.secondary">
           Registrá la asistencia diaria de tus alumnos
         </Typography>
@@ -135,9 +143,9 @@ export default function AsistenciaPage() {
               onChange={(e) => setIdCurso(e.target.value)}
               sx={{ minWidth: 250, flex: 1 }}
             >
-              {cursos.map((c) => (
-                <MenuItem key={c.idDocenteMateriaCurso} value={String(c.idCurso)}>
-                  {c.grado}° "{c.division}" — {c.nombreMateria} ({c.turno})
+              {cursosUnicos.map((c) => (
+                <MenuItem key={c.idCurso} value={String(c.idCurso)}>
+                  {c.grado}° "{c.division}" ({c.turno})
                 </MenuItem>
               ))}
             </TextField>
@@ -250,6 +258,7 @@ export default function AsistenciaPage() {
           )}
         </Card>
       )}
+      <CalendarioAsistenciaModal open={calendarioOpen} cursos={cursosUnicos} idCursoInicial={idCurso ? Number(idCurso) : undefined} onClose={() => setCalendarioOpen(false)} onSeleccionar={(curso, dia) => { setIdCurso(String(curso)); setFecha(dia); setCalendarioOpen(false); }} />
     </Box>
   );
 }

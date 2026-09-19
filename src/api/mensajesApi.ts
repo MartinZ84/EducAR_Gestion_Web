@@ -1,18 +1,18 @@
 import api from './axios';
-import { Mensaje, MensajeResumen } from '../types';
+import { Mensaje, MensajeResumen, ResultadoPaginado } from '../types';
 
 export const getMensajesRecibidos = async (pagina = 1, cantidad = 20) => {
-  const res = await api.get<{ datos: MensajeResumen[] }>('/Mensajes/recibidos', {
+  const res = await api.get<ResultadoPaginado<MensajeResumen>>('/Mensajes/recibidos', {
     params: { pagina, cantidad }
   });
-  return res.data.datos ?? res.data;
+  return res.data;
 };
 
 export const getMensajesEnviados = async (pagina = 1, cantidad = 20) => {
-  const res = await api.get<{ datos: MensajeResumen[] }>('/Mensajes/enviados', {
+  const res = await api.get<ResultadoPaginado<MensajeResumen>>('/Mensajes/enviados', {
     params: { pagina, cantidad }
   });
-  return res.data.datos ?? res.data;
+  return res.data;
 };
 
 export const getMensaje = async (id: number) => {
@@ -21,7 +21,8 @@ export const getMensaje = async (id: number) => {
 };
 
 export const enviarMensaje = async (dto: {
-  idUsuarioDestinat: number;
+  idUsuarioDestinat?: number;
+  idsUsuariosDestinatarios?: number[];
   asunto:            string;
   mensajeTexto:      string;
 }) => {
@@ -40,4 +41,17 @@ export const contarNoLeidos = async (): Promise<number> => {
   if (typeof data?.cantidad === 'number') return data.cantidad;
   if (typeof data?.noLeidos === 'number') return data.noLeidos;
   return 0;
+};
+
+export interface DestinatarioMensaje {
+  idUsuario: number;
+  idAlumno: number;
+  nombreCompleto: string;
+  nombreAlumno: string;
+  rol: string;
+}
+
+export const getDestinatariosMensaje = async () => {
+  const res = await api.get<DestinatarioMensaje[]>('/Mensajes/destinatarios');
+  return res.data;
 };

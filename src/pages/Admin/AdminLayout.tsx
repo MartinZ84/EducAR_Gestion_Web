@@ -20,6 +20,7 @@ import {
   Logout,
   ChevronLeft,
   Description,
+  HowToReg,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 
@@ -34,6 +35,9 @@ import CiclosLectivosPage from './CiclosLectivos/CiclosLectivosPage';
 import UsuariosPage from './Usuarios/UsuariosPage';
 import AsignacionesPage from './Asignaciones/AsignacionesPage';
 import MatriculasPage from './Matriculas/MatriculasPage';
+import AsistenciaPage from '../Docente/Asistencia/AsistenciaPage';
+import AsistenciaNotification from '../../components/AsistenciaNotification';
+import NotificationBar from '../../components/NotificationBar';
 
 const DRAWER_WIDTH = 260;
 const DRAWER_MINI_WIDTH = 72;
@@ -50,6 +54,7 @@ const menuItems = [
   { label: 'Usuarios', icon: <People />, ruta: '/admin/usuarios' },
   { label: 'Asignaciones', icon: <LinkIcon />, ruta: '/admin/asignaciones' },
   { label: 'Matrículas', icon: <School />, ruta: '/admin/matriculas' },
+  { label: 'Asistencia', icon: <HowToReg />, ruta: '/admin/asistencia' },
 ];
 
 export default function AdminLayout() {
@@ -260,7 +265,6 @@ export default function AdminLayout() {
 
       {/* CONTENIDO PRINCIPAL */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-
         {/* TOP BAR en mobile */}
         {isMobile && (
           <AppBar position="sticky" color="default" elevation={1} sx={{ bgcolor: 'white' }}>
@@ -276,6 +280,10 @@ export default function AdminLayout() {
           </AppBar>
         )}
 
+        <NotificationBar>
+          <AsistenciaNotification ruta="/admin/asistencia" />
+        </NotificationBar>
+
         {/* Área de contenido — las rutas se renderizan acá */}
         <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
           <Routes>
@@ -289,6 +297,7 @@ export default function AdminLayout() {
             <Route path="usuarios/*" element={<UsuariosPage />} />
             <Route path="asignaciones/*" element={<AsignacionesPage />} />
             <Route path="/matriculas" element={<MatriculasPage />} />
+            <Route path="asistencia" element={<AsistenciaPage />} />
           </Routes>
         </Box>
       </Box>

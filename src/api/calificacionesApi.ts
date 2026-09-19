@@ -7,19 +7,8 @@ export const getCalificaciones = async (
   idMateria: number,
   idPeriodo: number
 ) => {
-  const res = await api.get<Calificacion[]>(
+  const res = await api.get<{ calificaciones: Calificacion[] }>(
     `/Calificaciones/curso/${idCurso}/materia/${idMateria}/periodo/${idPeriodo}`
   );
-  return res.data;
-};
-
-
-export const registrarCalificaciones = async (dto: {
-  idCurso:             number;
-  idMateria:           number;
-  idPeriodoEvaluacion: number;
-  alumnos: { idAlumno: number; valorCalificacion: number; observacion?: string }[];
-}) => {
-  const res = await api.post('/Calificaciones', dto);
-  return res.data;
+  return res.data.calificaciones;
 };

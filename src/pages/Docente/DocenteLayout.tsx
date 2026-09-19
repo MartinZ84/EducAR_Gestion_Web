@@ -23,9 +23,12 @@ import { contarNoLeidos } from '../../api/mensajesApi';
 import DocenteDashboard from './Dashboard/DocenteDashboard';
 import MisCursosPage from './MisCursos/MisCursosPage';
 import AsistenciaPage from './Asistencia/AsistenciaPage';
-import CalificacionesPage from './Calificaciones/CalificacionesPage';
+import EvaluacionesPage from './Calificaciones/EvaluacionesPage';
 import BoletinesPage from './Boletines/BoletinesPage';
 import MensajesPage from './Mensajes/MensajesPage';
+import AsistenciaNotification from '../../components/AsistenciaNotification';
+import MensajesNotification from '../../components/MensajesNotification';
+import NotificationBar from '../../components/NotificationBar';
 
 const DRAWER_WIDTH = 260;
 const DRAWER_MINI_WIDTH = 72;
@@ -62,7 +65,7 @@ export default function DocenteLayout() {
       label: 'Mensajes',
       ruta: '/docente/mensajes',
       icon: (
-        <Badge badgeContent={Number(noLeidos) || 0} color="error" max={99}>
+        <Badge badgeContent={Number(noLeidos) || 0} color="error" max={99} overlap="circular">
           <Email />
         </Badge>
       )
@@ -150,7 +153,7 @@ export default function DocenteLayout() {
               >
                 <ListItemIcon sx={{
                   color: activo ? 'white' : 'text.secondary',
-                  minWidth: sidebarOpen ? 40 : 'unset',
+                  minWidth: sidebarOpen ? (item.ruta === '/docente/mensajes' ? 48 : 40) : 'unset',
                 }}>
                   {item.icon}
                 </ListItemIcon>
@@ -249,12 +252,17 @@ export default function DocenteLayout() {
           </AppBar>
         )}
 
+        <NotificationBar>
+          <AsistenciaNotification ruta="/docente/asistencia" />
+          <MensajesNotification ruta="/docente/mensajes" />
+        </NotificationBar>
+
         <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
           <Routes>
             <Route index element={<DocenteDashboard />} />
             <Route path="mis-cursos" element={<MisCursosPage />} />
             <Route path="asistencia" element={<AsistenciaPage />} />
-            <Route path="calificaciones" element={<CalificacionesPage />} />
+            <Route path="calificaciones" element={<EvaluacionesPage />} />
             <Route path="boletines" element={<BoletinesPage />} />
             <Route path="mensajes" element={<MensajesPage />} />
           </Routes>

@@ -1,6 +1,7 @@
 import api from './axios';
 
 export interface AlumnoCursoAsignacion {
+  idMatricula: number;
   idAlumno: number;
   idCurso: number;
   [key: string]: unknown;
@@ -11,6 +12,8 @@ export interface AlumnoTutorAsignacion {
   idTutor: number;
   parentesco?: string | null;
   esResponsablePrinc?: boolean;
+  nombreTutor?: string;
+  apellidoTutor?: string;
   [key: string]: unknown;
 }
 
@@ -31,16 +34,16 @@ const toArray = <T>(data: unknown): T[] => {
 };
 
 export const getCursosDeAlumno = async (idAlumno: number) => {
-  const res = await api.get<unknown>(`/AlumnoCurso/alumno/${idAlumno}`);
+  const res = await api.get<unknown>(`/Matriculas/alumno/${idAlumno}`);
   return toArray<AlumnoCursoAsignacion>(res.data);
 };
 
 export const asignarAlumnoACurso = async (idAlumno: number, idCurso: number) => {
-  await api.post(`/Alumnos/${idAlumno}/cursos`, { idCurso });
+  await api.post('/Matriculas', { idAlumno, idCurso });
 };
 
-export const desasignarAlumnoDeCurso = async (idAlumno: number, idCurso: number) => {
-  await api.delete(`/Alumnos/${idAlumno}/cursos/${idCurso}`);
+export const desasignarAlumnoDeCurso = async (idMatricula: number) => {
+  await api.delete(`/Matriculas/${idMatricula}`);
 };
 
 export const getTutoresDeAlumno = async (idAlumno: number) => {

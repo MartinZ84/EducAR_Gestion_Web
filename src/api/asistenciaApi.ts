@@ -26,3 +26,12 @@ export const getAsistenciaPorAlumno = async (idAlumno: number, idCurso: number) 
   const res = await api.get(`/Asistencia/alumno/${idAlumno}/curso/${idCurso}`);
   return res.data;
 };
+
+export interface DiaCalendarioAsistencia { fecha: string; estado: 'Cargada' | 'Pendiente' | 'Futura' | 'NoLaborable'; motivo?: string | null }
+export interface CalendarioAsistencia { idCurso: number; curso: string; fechaInicio: string; fechaFin: string; pendientes: number; dias: DiaCalendarioAsistencia[] }
+
+export const getCalendarioAsistencia = async (idCurso: number) =>
+  (await api.get<CalendarioAsistencia>(`/Asistencia/calendario/${idCurso}`)).data;
+
+export const getPendientesAsistencia = async () =>
+  (await api.get<{ cantidad: number; cursosConPendientes: number }>('/Asistencia/pendientes')).data;
